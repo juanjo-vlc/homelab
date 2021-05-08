@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "official-centos-8"
+  config.vm.box_url = "https://cloud.centos.org/centos/8/vagrant/x86_64/images/CentOS-8-Vagrant-8.3.2011-20201204.2.x86_64.vagrant-virtualbox.box"
+  
+  config.vm.provision :ansible do |ansible|
+    ansible.playbook = "provisioning/provisioning.yml"
+  end
+
+  (1..2).each do |i|
+    config.vm.define "ipsec#{i}" do |node|
+      node.vm.hostname = "ipsec#{i}"
+      node.vm.network "private_network", ip: "10.200.200.10#{i}",
+        virtualbox__intnet: "ansiblenet"
+      node.vm.network "private_network", ip: "192.168.13#{i}.2"
+
+      node.vm.provider "virtualbox" do |vb|
+        # Use linked images instead of copying the base for
+        # each vm
+        vb.linked_clone = true
+
+        # Display the VirtualBox GUI when booting the machine
+        #vb.gui = true
+
+        # Set up the VM's name
+        vb.name = "vagrant_ipsec#{i}"
+
+        # Don't check for guest additions
+        vb.check_guest_additions = false
+    
+        # Customize the amount of memory on the VM:
+        vb.memory = "2048"
+        # Customize the amount of vcpus
+        vb.cpus = "2"
+
+	vb.customize ["modifyvm", :id, "--groups", "/ipsec"]
+      end
+    end
+  end
+end

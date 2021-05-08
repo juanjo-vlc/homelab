@@ -1,0 +1,60 @@
+---
+- name: Configure site-to-site vpn
+  hosts: ipsec
+  vars:
+    leftdev: eth2
+    leftsrc: 192.168.131.2
+    righttgt: 192.168.132.2
+  roles:
+    - setup_ipsec
+  tasks:
+    - name: restart ipsec
+      service:
+        name: ipsec
+        state: restarted
+        enabled: yes
+    - name: install httpd for testing
+      package:
+        name: httpd
+        state: present
+      when: position == 'right'
+    - name: start and enable httpd
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+      when: position == 'right'
+    - name: create an hello world message
+      copy:
+        content: "Hello world!"
+        dest: /var/www/html/hello.txt
+        owner: apache
+        group: apache
+        mode: 0644
+      when: position == 'right'
+      tags: test
+    - name: create a route to the right
+      command:
+        cmd: "ip route add {{ rightsubnet }} dev {{ leftdev }} src {{ leftsrc }}"
+      when: position == 'left'
+      ignore_errors: yes
+    - name:  get from the http server on the right side
+      get_url:
+        url: "http://{{ righttgt }}/hello.txt"
+        dest: /tmp/hello.txt
+        use_proxy: no
+        force: yes
+      register: httpresult
+      when: position == 'left'
+      tags: test
+    - name: show http result
+      debug:
+        var: httpresult
+      when: httpresult is defined
+      tags: test
+    - name: cleanup
+      file:
+        path: /tmp/hello.txt
+        state: absent
+      tags: test
+      

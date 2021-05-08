@@ -1,0 +1,14 @@
+- name: import rootca
+  command:
+    cmd: "certutil -d sql:/etc/ipsec.d -A -n rootCA -t C,C,p -a -i {{ ca_path }}"
+
+- name: import pkcs12
+  command: 
+    cmd: "pk12util -d sql:/etc/ipsec.d -i {{ pkcs12_path }} -W {{ privatekey_passphrase }}"
+
+- name: restart ipsec service
+  service:
+    name: ipsec
+    state: restarted
+  listen: restart ipsec
+

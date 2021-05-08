@@ -1,0 +1,34 @@
+subnetname: mysubnet
+tunnelname: mytunnel
+leftsubnet: 192.168.131.0/24
+rightsubnet: 192.168.132.0/24
+autostart: start
+
+leftcert: left
+leftid: left
+leftip: 10.200.200.101
+
+rightcert: right
+rightid: right
+rightip: 10.200.200.102
+
+csr_base_path: /etc/pki/tls/csr
+privatekey_path: /etc/pki/tls/private/{{ position }}.key
+privatekey_passphrase: overrideme
+csr_path: "{{ csr_base_path }}/{{ position }}.csr"
+certificate_path: /etc/pki/tls/certs/{{ position }}.crt
+ca_path: "/etc/pki/tls/certs/rootca.pem"
+pkcs12_path: /etc/pki/tls/certs/{{ position }}.p12
+
+cert_country_name: "ES"
+cert_locality_name: "Albal"
+cert_state_name: "Valencia"
+cert_organization_name: "Garmo Labs Inc"
+cert_ou_name: "Automation"
+
+# Get sensitive variables from vault file
+ownca_content: "{{ cacertificate }}"
+ownca_privatekey_content: "{{ caprivkey }}"
+ownca_privatekey_passphrase: "{{ capass }}"
+
+

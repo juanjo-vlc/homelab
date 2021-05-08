@@ -1,0 +1,18 @@
+conn {{ subnetname }}
+    also={{ tunnelname }}
+    leftsubnet={{ leftsubnet }}
+    rightsubnet={{ rightsubnet }}
+
+conn {{ tunnelname }}
+    {% if position == 'left' -%}
+      leftcert={{ leftcert }}
+    {%- else -%}
+      rightcert={{ rightcert }}
+    {%- endif %}
+
+    leftid={{ leftid }}
+    left={{ leftip }}
+    rightid={{ rightid }}
+    right={{ rightip }}
+    auto={{ autostart }}
+

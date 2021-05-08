@@ -1,0 +1,97 @@
+- name: update all packages
+  package:
+    name: "*"
+    state: latest
+
+- name: install libreswan
+  package:
+    name: libreswan
+    state: installed
+
+- name: enable ipsec service
+  service:
+    name: ipsec
+    enabled: yes
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: gather service facts
+  service_facts:
+
+- name: enable firewalld services
+  firewalld:
+    service: ipsec
+    state: enabled
+    immediate: "{{ ('firewalld.services' in ansible_facts['services'] and ansible_facts['services']['firewalld.service']['state']=='running')|bool }}"
+    permanent: yes
+
+- name: install cryptography module
+  package:
+    name: python3-cryptography
+    state: installed
+
+- name: install python-openssl module
+  package:
+    name: python3-pyOpenSSL
+    state: installed
+
+- name: create a directory for csr
+  file:
+    path: "{{ csr_base_path }}"
+    state: directory
+
+- name: generate a private key
+  community.crypto.openssl_privatekey:
+    path: "{{ privatekey_path }}"
+    backup: yes
+
+- name: generate a CSR
+  community.crypto.openssl_csr:
+    common_name: "{{ position }}"
+    country_name: "{{ cert_country_name }}"
+    locality_name: "{{ cert_locality_name }}"
+    state_or_province_name: "{{ cert_state_name }}"
+    organization_name: "{{ cert_organization_name }}"
+    organizational_unit_name: "{{ cert_ou_name }}"
+    privatekey_path: "{{ privatekey_path }}"
+    subject_alt_name: "{{ ['DNS:' +  ansible_facts['fqdn'], 'DNS:' + position ] + ansible_facts['all_ipv4_addresses'] | map('regex_replace', '^', 'IP:') | list }}"
+    subject:
+      CN: "{{ position }}"
+    path: "{{ csr_path }}"
+    backup: yes
+
+- name: generate a certificate
+  community.crypto.x509_certificate:
+    path: "{{ certificate_path }}"
+    privatekey_path: "{{ privatekey_path }}"
+    csr_path: "{{ csr_path }}"
+    provider: ownca
+    ownca_content: "{{ ownca_content }}" 
+    ownca_privatekey_content: "{{ ownca_privatekey_content }}"
+    ownca_privatekey_passphrase: "{{ ownca_privatekey_passphrase }}"
+
+- name: copy root CA
+  copy:
+    content: "{{ ownca_content }}"
+    dest: "{{ ca_path }}"
+  notify: import rootca
+
+- name: generate a pkcs12 file
+  community.crypto.openssl_pkcs12:
+    certificate_path: "{{ certificate_path }}"
+    privatekey_path: "{{ privatekey_path }}"
+    other_certificates: "{{ ca_path }}"
+    passphrase: "{{ privatekey_passphrase }}"
+    friendly_name: "{{ position }}"
+    path: "{{ pkcs12_path }}"
+    backup: yes
+  notify: import pkcs12
+
+- name: flush handlers
+  meta: flush_handlers 
+
+- name: copy configuration file
+  template:
+    src: ./templates/site2site-x509.conf.j2
+    dest: /etc/ipsec.d/site2site-x509.conf
+  notify: restart ipsec
+
