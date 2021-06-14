@@ -1,0 +1,19 @@
+node1 swarm_labels=['mongo.replica=1']
+node2 swarm_labels=['mongo.replica=2']
+node3 swarm_labels=['mongo.replica=3']
+
+[docker_engine]
+node1
+node2
+node3
+
+[docker_swarm_manager]
+node1
+
+[docker_swarm_worker]
+node2
+node3
+
+
+
+
