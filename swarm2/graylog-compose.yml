@@ -1,0 +1,268 @@
+version: "3.9"
+
+x-default-logs: &default-opts
+  logging:
+    options:
+      max-size: "1m"
+
+x-data-opts: &data
+  ES_JAVA_OPTS: "-Xmx2g -Xms2g"
+  discovery.seed_resolver.timeout: 60s
+  discovery.seed_hosts: esdata1,esdata2
+  cluster.initial_master_nodes: esdata1,esdata2
+  cluster.name: "graylog"
+  network.host: 0.0.0.0
+  node.master: "true"
+  node.data: "true"
+
+services:
+  mongo1:
+    image: mongo:4
+    command: mongod --replSet graylog --noauth --oplogSize 3
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-1:/data/db
+      - mongo-config-1:/data/configdb
+    networks:
+      - graylog
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 1
+  mongo2:
+    image: mongo:4
+    command: mongod --replSet graylog --noauth --oplogSize 3
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-2:/data/db
+      - mongo-config-2:/data/configdb
+    networks:
+      - graylog
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 2
+
+  mongo3:
+    image: mongo:4
+    command: mongod --replSet graylog --noauth --oplogSize 3
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-3:/data/db
+      - mongo-config-3:/data/configdb
+    networks:
+      - graylog 
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 3
+
+  esdata1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.1
+    environment:
+      <<: *data
+      node.name: "esdata1"
+    networks:
+      - graylog
+    volumes:
+#      - esdata1:/usr/share/elasticsearch/data
+       - /es-data/elasticsearch:/usr/share/elasticsearch/data:z
+    deploy:
+      placement:
+        constraints: [node.labels.data1 ==  true]
+      replicas: 1
+      resources:
+        limits:
+          memory: 4G
+  esdata2:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.1
+    environment:
+      <<: *data
+      node.name: "esdata2"
+    networks:
+      - graylog
+    volumes:
+      #- esdata2:/usr/share/elasticsearch/data
+      - /es-data/elasticsearch:/usr/share/elasticsearch/data:z
+    deploy:
+      placement:
+        constraints: [node.labels.data2 == true]
+      replicas: 1
+      resources:
+        limits:
+          memory: 4G
+  graylogmaster:
+    image: graylog/graylog:4.0.8
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=thisisnotarandomtext
+      # Password: admin
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://192.168.33.201:9000/
+      - GRAYLOG_IS_MASTER=True
+      - GRAYLOG_MONGODB_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/graylog?replicaSet=graylog
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://esdata1:9200,http://esdata2:9200
+      - GRAYLOG_ELASTICSEARCH_VERSION=7
+    networks:
+      - graylog
+    deploy:
+      placement:
+        constraints: [node.hostname == node1]
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+    ports:
+      - published: 9000
+        target: 9000
+
+  graylogslave2:
+    image: graylog/graylog:4.0.8
+    hostname: graylogslave2
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=thisisnotarandomtext
+      # Password: admin
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://192.168.33.201:9000/
+      - GRAYLOG_IS_MASTER=False
+      - GRAYLOG_MONGODB_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/graylog?replicaSet=graylog
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://esdata1:9200,http://esdata2:9200
+      - GRAYLOG_HTTP_PUBLISH_URI=http://graylogslave2:9000/
+      - GRAYLOG_ELASTICSEARCH_VERSION=7
+    networks:
+      - graylog
+       
+    deploy:
+      placement:
+        constraints: [node.hostname == node2]
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+
+  graylogslave3:
+    image: graylog/graylog:4.0.8
+    hostname: graylogslave3
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=thisisnotarandomtext
+      # Password: admin
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://192.168.33.201:8080/
+      - GRAYLOG_IS_MASTER=False
+      - GRAYLOG_MONGODB_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/graylog?replicaSet=graylog
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://esdata1:9200,http://esdata2:9200
+      - GRAYLOG_HTTP_PUBLISH_URI=http://graylogslave3:9000/
+      - GRAYLOG_ELASTICSEARCH_VERSION=7
+    networks:
+      - graylog
+       
+    deploy:
+      placement:
+        constraints: [node.hostname == node3]
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+
+  haproxy:
+    image: haproxytech/haproxy-alpine:2.4 
+    ports:
+      - published: 80
+        target: 9000
+        protocol: tcp
+        mode: host
+      - published: 8080
+        target: 9000
+        protocol: tcp
+        mode: host
+    networks:
+      - graylog
+    configs:
+      - source: haproxy
+        target: /usr/local/etc/haproxy/haproxy.cfg 
+        mode: 0444
+    volumes:
+      - haproxy-socket:/var/run/haproxy/:rw
+    dns: 127.0.0.11
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+  rsyslog:
+    image: jbenninghoff/rsyslog-forwarder
+    ports:
+      - published: 514
+        target: 514
+        protocol: tcp
+        mode: host
+      - published: 514
+        target: 514
+        protocol: udp
+        mode: host
+    networks:
+      - graylog
+    configs:
+      - source: rsyslog
+        target: /etc/rsyslog.conf
+        mode: 0444
+    dns: 127.0.0.11
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+     
+  cerebro:
+    image: juanjovlc2/cerebro:latest
+    environment:
+      - "CEREBRO_BASE_PATH=/cerebro/"
+      - "CEREBRO_PORT=8000"
+    networks:
+      - graylog
+    ports:
+      - 8000:8000
+
+
+networks:
+  graylog:
+    driver: overlay
+    attachable: true
+    name: graylog
+
+configs:
+  haproxy:
+    file: haproxy.cfg
+  rsyslog:
+    file: rsyslog.conf
+
+volumes:
+  esdata1:
+    driver_opts:
+      type: bind
+      source: /es-data
+  esdata2:
+    driver_opts:
+      type: bind
+      source: /es-data
+  mongo-data-1:
+  mongo-data-2:
+  mongo-data-3:
+  mongo-config-1:
+  mongo-config-2:
+  mongo-config-3:
+  haproxy-socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=99"

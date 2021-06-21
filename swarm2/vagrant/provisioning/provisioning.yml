@@ -1,0 +1,26 @@
+---
+- name: Vagrant provisioning
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+   - name: setup roots ssh key
+     authorized_key:
+       user: root
+       key: "{{ lookup('file', './keys/root-id_rsa.pub') }}"
+   - name: add cotterpin user
+     user:
+       name: cotterpin
+       comment: Automation user
+       password_lock: yes
+
+   - name: setup cotterpin ssh key
+     authorized_key:
+       user: cotterpin 
+       key: "{{ lookup('file', './keys/cotterpin-id_rsa.pub') }}"
+
+   - name: setup sudoers
+     copy:
+       dest: /etc/sudoers.d/cotterpin
+       content: "cotterpin ALL=(ALL) NOPASSWD:ALL"
+

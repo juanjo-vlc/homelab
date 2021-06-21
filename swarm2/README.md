@@ -1,0 +1,1 @@
+This folder contains the files used on my lab exercise described on my [Putting the swarm to work](https://juanjo.garciaamaya.com/posts/docker/putting-the-swarm-to-work/) blog post, which is a continuation of [Starting with Docker Swarm](https://juanjo.garciaamaya.com/posts/docker/starting-with-docker-swarm/).
