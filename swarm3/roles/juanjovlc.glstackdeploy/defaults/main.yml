@@ -1,0 +1,40 @@
+glstackdeploy_stack_name: glstack
+glstackdeploy_network_name: graylog
+glstackdeploy_base_dir: /opt/{{ glstackdeploy_stack_name }}
+glstackdeploy_data_dir: /dockerdata
+
+
+
+glstackdeploy_deploy_kibana: no
+glstackdeploy_expose_kibana: no
+
+glstackdeploy_deploy_cerebro: yes
+
+glstackdeploy_es_version: 7.13.1
+glstackdeploy_es_master_memory_mb: 2048
+glstackdeploy_es_data_memory_mb: 4096
+glstackdeploy_es_datatypes: ['hot', 'warm']
+glstackdeploy_es_password: 'please_use_ansible_vault'
+glstackdeploy_es_certifcate: ./tls/escert.crt
+glstackdeploy_es_certifcate_key: ./tls/escert.key
+glstackdeploy_es_security: "false"
+
+glstackdeploy_gl_expose_master: no
+
+glstackdeploy_gl_elasticsearch_max_size_per_index: 1073741824
+glstackdeploy_gl_elasticsearch_max_number_of_indices: 20
+glstackdeploy_gl_retention_strategy: 'delete'
+glstackdeploy_gl_elasticsearch_shards: 2
+glstackdeploy_gl_elasticsearch_replicas: 1
+glstackdeploy_gl_output_batch_size: 1000
+glstackdeploy_gl_processbuffer_processors: 2
+glstackdeploy_gl_outputbuffer_processors: 1
+glstackdeploy_gl_processor_wait_strategy: 'blocking'
+glstackdeploy_gl_inputbuffer_processors: 1
+glstackdeploy_gl_message_journal_max_size_gb: 5
+glstackdeploy_gl_prometheus_exporter_enabled: true
+glstackdeploy_gl_prometheus_exporter_bind_port: 9833
+glstackdeploy_gl_content_packs_auto_install: 'default-inputs.json'
+glstackdeploy_gl_content_packs_dir: 'data/contentpacks'
+glstackdeploy_gl_content_packs_loader_enabled: true
+

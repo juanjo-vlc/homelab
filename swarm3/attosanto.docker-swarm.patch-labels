@@ -1,0 +1,13 @@
+diff -ru roles-orig/atosatto.docker-swarm/tasks/setup-swarm-labels.yml roles/atosatto.docker-swarm/tasks/setup-swarm-labels.yml
+--- roles-orig/atosatto.docker-swarm/tasks/setup-swarm-labels.yml	2020-05-08 13:29:54.000000000 +0200
++++ roles/atosatto.docker-swarm/tasks/setup-swarm-labels.yml	2021-07-05 12:34:52.154417585 +0200
+@@ -22,7 +22,7 @@
+     - swarm_labels
+ 
+ - name: Assign labels to swarm nodes if any.
+-  command: docker node update --label-add {{ item }}=true {{ ansible_fqdn|lower }}
++  command: docker node update --label-add {{ (item.find('=') > 0) | ternary( item , item ~ "=true") }} {{ ansible_fqdn|lower }}
+   when: item not in docker_swarm_labels.stdout_lines
+   with_items:
+     - "{{ swarm_labels  | default([]) }}"
+

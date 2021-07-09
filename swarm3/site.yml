@@ -1,0 +1,98 @@
+---
+- name: Deploy a swarm
+  hosts: all
+  tags: deploySwarm
+  vars:
+    docker_swarm_interface: eth1
+    docker_compose_version: 1.29.2
+    containerd_service_override: |
+      [Service]
+      LimitMEMLOCK=infinity
+
+  pre_tasks:
+#    - name: update all
+#      package:
+#        name: "*"
+#        state: latest
+    - name: create group docker
+      group:
+        name: docker
+        state: present
+    - name: create user
+      user:
+        name: dockeradm
+        groups: docker
+        append: yes
+        state: present
+    - name: Set vm.max_map_count
+      sysctl:
+        name: vm.max_map_count
+        value: "262144"
+  roles:
+    - atosatto.docker-swarm
+
+- name: Create lvm volumes
+  hosts: all 
+  tags: dataVolume
+  tasks:
+    - name: install LVM programs
+      package:
+        name: lvm2
+        state: present
+    - name: Create a partition
+      parted:
+        device: /dev/sdb
+        label: gpt
+        name: dockerdata
+        number: 1
+        align: optimal
+        part_start: 0%
+        part_end: 100%
+        state: present
+        flags: [lvm]
+    - name: Create pv
+      lvg:
+        pvs: /dev/sdb1
+        vg: dockervg
+    - name: Create lvol
+      lvol:
+        lv: dockerdata
+        vg: dockervg
+        size: "100%VG" 
+        state: present
+    - name: Format lvol
+      filesystem:
+        fstype: ext4
+        dev: /dev/mapper/dockervg-dockerdata
+        opts: "-L ESDATA"
+    - name: Mount volume
+      mount:
+        src: /dev/mapper/dockervg-dockerdata
+        path: /dockerdata
+        state: mounted
+        fstype: ext4
+    - name: Create elasticsearch datadir
+      file:
+        path: /dockerdata/elasticsearch
+        owner: 1000
+        group: 1000
+        state: directory
+    - name: Create kibana datadir
+      file:
+        path: /dockerdata/kibana
+        owner: 1000
+        group: 1000
+        state: directory
+    
+    - name: Create graylog journal 
+      file:
+        path: /dockerdata/graylog
+        owner: 1100
+        group: 1100
+        state: directory
+
+- name: Deploy stack
+  tags: deployStack
+  hosts: docker_swarm_manager
+  roles:
+    - juanjovlc.glstackdeploy

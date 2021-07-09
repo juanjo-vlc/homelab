@@ -1,0 +1,105 @@
+- name: Create deploy directory
+  file:
+    path: "{{ glstackdeploy_base_dir }}"
+    state: directory
+
+- name: Create deploy configurations directory
+  file:
+    path: "{{ glstackdeploy_base_dir }}/conf/"
+    state: directory
+
+- name: Create deploy scripts directory
+  file:
+    path: "{{ glstackdeploy_base_dir }}/scripts/"
+    state: directory
+
+- name: Create secrets directory
+  file:
+    path: "{{ glstackdeploy_base_dir }}/secrets/"
+    state: directory
+
+- name: Create certs directory
+  file:
+    path: "{{ glstackdeploy_base_dir }}/tls/"
+    state: directory
+
+- name: Create docker-compose file
+  template:
+    src: glstackdeploy.yml.j2
+    dest: "{{ glstackdeploy_base_dir }}/glstackdeploy.yml"
+
+- name: Create rsyslog.conf file
+  template:
+    src: rsyslog.conf.j2
+    dest: "{{ glstackdeploy_base_dir }}/conf/rsyslog.conf"
+
+- name: Create haproxy.cfg file
+  template:
+    src: haproxy.cfg.j2
+    dest: "{{ glstackdeploy_base_dir }}/conf/haproxy.cfg"
+
+- name: Create graylog.conf file
+  template:
+    src: graylog.conf.j2
+    dest: "{{ glstackdeploy_base_dir }}/conf/graylog.conf"
+
+- name: Copy content-pack
+  copy:
+    src: files/default-inputs.json
+    dest: "{{ glstackdeploy_base_dir }}/conf/default-inputs.json"
+
+- name: Create mongodb init script
+  template:
+    src: init-replicaset.sh.j2
+    dest: "{{ glstackdeploy_base_dir }}/scripts/init-replicaset.sh"
+    mode: 0750
+
+- name: Create espasswd file
+  copy:
+    content: "{{ glstackdeploy_es_password }}"
+    dest: "{{ glstackdeploy_base_dir }}/secrets/espasswd.txt"
+    mode: 0600
+
+- name: Copy certificate for elasticsearch
+  copy:
+    src: "{{ glstackdeploy_es_certifcate }}"
+    dest: "{{ glstackdeploy_base_dir }}/tls/escert.crt" 
+
+- name: Copy private key for elasticsearch
+  copy:
+    src: "{{ glstackdeploy_es_certifcate_key }}"
+    dest: "{{ glstackdeploy_base_dir }}/tls/escert.key" 
+
+- name: Install python jsondiff
+  pip:
+    name: jsondiff
+    state: present
+
+- name: Deploy compose into swarm
+  community.docker.docker_stack:
+    state: present
+    name: "{{ glstackdeploy_stack_name }}"
+    compose:
+      - "{{ glstackdeploy_base_dir }}/glstackdeploy.yml"
+  run_once: yes
+  tags: deployCompose
+
+- name: Mongodb init block
+  block:
+    - name: Pause for 60s, waiting for mongo to start
+      pause:
+        prompt: Giving time mongo1 to start
+        seconds: 60
+    - name: Call init script
+      shell:
+        cmd: "{{ glstackdeploy_base_dir }}/scripts/init-replicaset.sh"
+      register: initoutput
+      tags: never
+
+    - name: View init output
+      debug:
+        var: initoutput.stdout_lines
+      when: initoutput is defined
+  run_once: yes
+  delegate_to: node1
+  tags: never

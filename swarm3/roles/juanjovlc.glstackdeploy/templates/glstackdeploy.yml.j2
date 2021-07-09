@@ -1,0 +1,340 @@
+version: "3.9"
+
+x-default-logs: &default-opts
+  logging:
+    options:
+      max-size: "1m"
+
+x-esdata-opts: &data
+  ES_JAVA_OPTS: "-Xmx{{ "%d"|format(glstackdeploy_es_data_memory_mb / 2)}}m -Xms{{ "%d"|format(glstackdeploy_es_data_memory_mb / 2) }}m"
+  discovery.seed_resolver.timeout: 60s
+  discovery.seed_hosts: esmaster1,esmaster2,esmaster3
+  cluster.initial_master_nodes: esmaster1,esmaster2,esmaster3
+  cluster.name: "graylog"
+  network.host: 0.0.0.0
+  node.master: "false"
+  node.data: "true"
+{% if glstackdeploy_es_security == "true" %}
+  xpack.security.enabled: "{{ glstackdeploy_es_security }}"
+  xpack.security.http.ssl.enabled: "false"
+  xpack.security.transport.ssl.enabled: "true"
+  xpack.security.transport.ssl.verification_mode: none 
+  xpack.security.transport.ssl.certificate: /run/secrets/escert
+  xpack.security.transport.ssl.key: /run/secrets/escertkey
+  xpack.security.transport.ssl.key_passphrase: patata
+  ELASTICSEARCH_PASSWORD: patatasecreta
+{% endif %}
+
+
+x-esmaster-opts: &esmaster
+  ES_JAVA_OPTS: "-Xmx{{ "%d"|format(glstackdeploy_es_master_memory_mb / 2) }}m -Xms{{ "%d"|format(glstackdeploy_es_master_memory_mb / 2) }}m"
+  discovery.seed_resolver.timeout: 60s
+  discovery.seed_hosts: esmaster1,esmaster2,esmaster3
+  cluster.initial_master_nodes: esmaster1,esmaster2,esmaster3
+  cluster.name: "graylog"
+  network.host: 0.0.0.0
+  node.master: "true"
+  node.data: "false"
+{% if glstackdeploy_es_security == "true" %}
+  xpack.security.enabled: "{{ glstackdeploy_es_security }}"
+  xpack.security.http.ssl.enabled: "false"
+  xpack.security.transport.ssl.enabled: "true"
+  xpack.security.transport.ssl.verification_mode: none 
+  xpack.security.transport.ssl.certificate: /run/secrets/escert
+  xpack.security.transport.ssl.key: /run/secrets/escertkey
+  xpack.security.transport.ssl.key_passphrase: patata
+  ELASTICSEARCH_PASSWORD: patatasecreta
+{% endif %}
+
+x-eslasticsearch-common: &escommon
+  image: docker.elastic.co/elasticsearch/elasticsearch:{{ glstackdeploy_es_version }}
+  hostname: esdata-{{ '{{' }} .Node.Hostname {{ '}}' }}
+  volumes:
+    - {{ glstackdeploy_data_dir }}/elasticsearch:/usr/share/elasticsearch/data:z
+  configs:
+    - source: escert
+      target: /usr/share/elasticsearch/config/escert.crt
+      mode: 0444
+    - source: escertkey
+      target: /usr/share/elasticsearch/config/escert.key
+      mode: 0444
+  networks:
+    - {{ glstackdeploy_network_name }}
+
+{% if glstackdeploy_deploy_kibana %}
+x-kibana-common: &kibanacommon
+  image: docker.elastic.co/kibana/kibana:{{ glstackdeploy_es_version }}
+  networks:
+    - {{ glstackdeploy_network_name }}
+  volumes:
+    - {{ glstackdeploy_data_dir }}/kibana:/usr/share/kibana/data:z
+  environment:
+    SERVER_BASEPATH: '/kibana'
+    ELASTICSEARCH_HOSTS: 'http://esdata:9200/'
+    SERVER_REWRITEBASEPATH: 'true'
+  {% if glstackdeploy_expose_kibana %}
+  ports:
+    - published: 5601
+      target: 5601
+      protocol: tcp
+  {% endif %}
+{% endif %}
+
+x-graylog-common: &glcommon
+  image: graylog/graylog:4.1
+  configs:
+    - source: graylog
+      target: /usr/share/graylog/data/config/graylog.conf
+      mode: 0444
+    - source: defaultinputs
+      target: /usr/share/graylog/data/contentpacks/default-inputs.json
+      mode: 0444
+  volumes:
+    - "{{ glstackdeploy_data_dir }}/graylog:/usr/share/graylog/data/journal:z"
+  networks:
+    - {{ glstackdeploy_network_name }}
+  healthcheck:
+      disable: true
+
+x-mongo-common: &mongocommon
+  image: mongo:4
+  command: mongod --replSet graylog --noauth --oplogSize 3
+  networks:
+    - {{ glstackdeploy_network_name }}
+  environment:
+    TERM: xterm
+
+services:
+  mongo1:
+    <<: *mongocommon
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-1:/data/db
+      - mongo-config-1:/data/configdb
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 1
+  mongo2:
+    <<: *mongocommon
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-2:/data/db
+      - mongo-config-2:/data/configdb
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 2
+
+  mongo3:
+    <<: *mongocommon
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongo-data-3:/data/db
+      - mongo-config-3:/data/configdb
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.mongo.replica == 3
+ 
+  esmaster1:
+    <<: *escommon
+    environment:
+      <<: *esmaster
+      node.name: esmaster1
+    deploy:
+      placement:
+        constraints: [node.labels.esmaster == true]
+      replicas: 1
+      resources:
+        limits:
+          memory: {{ glstackdeploy_es_master_memory_mb }}M
+          
+  esmaster2:
+    <<: *escommon
+    environment:
+      <<: *esmaster
+      node.name: esmaster2
+    deploy:
+      placement:
+        constraints: [node.labels.esmaster == true]
+      replicas: 1
+      resources:
+        limits:
+          memory: {{ glstackdeploy_es_master_memory_mb }}M
+
+  esmaster3:
+    <<: *escommon
+    environment:
+      <<: *esmaster
+      node.name: esmaster3
+    deploy:
+      placement:
+        constraints: [node.labels.esmaster == true]
+      replicas: 1
+      resources:
+        limits:
+          memory: {{ glstackdeploy_es_master_memory_mb }}M
+
+{% for datatype in glstackdeploy_es_datatypes %}
+  esdata-{{ datatype }}:
+    <<: *escommon
+    environment:
+      <<: *data
+      node.attr.box_type: {{ datatype }}
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.esdata == {{ datatype }}]
+      resources:
+        limits:
+          memory: {{ glstackdeploy_es_data_memory_mb }}M
+{% endfor %}
+
+  graylogmaster:
+    <<: *glcommon
+    hostname: graylogmaster
+    environment:
+      - GRAYLOG_IS_MASTER=True
+      - GRAYLOG_HTTP_PUBLISH_URI=http://graylogmaster:9000/
+{% if glstackdeploy_gl_expose_master %}
+    ports:
+      - published: 9000
+        target: 9000
+        protocol: tcp
+{% endif %}
+    deploy:
+      placement:
+        constraints: [node.labels.glmaster == true]
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+
+  graylogslave:
+    <<: *glcommon
+    hostname: gls-{{ '{{' }} .Node.Hostname {{ '}}' }}
+    environment:
+      - GRAYLOG_IS_MASTER=False
+      - GRAYLOG_HTTP_PUBLISH_URI=http://gls-{{ '{{' }} .Node.Hostname {{ '}}' }}:9000/
+       
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.glslave == true]
+      resources:
+        limits:
+          memory: 2G
+
+  {% if glstackdeploy_deploy_kibana %}
+  kibana:
+    <<: *kibanacommon
+    hostname: kibana
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+  {% endif %}
+
+  haproxy:
+    image: haproxytech/haproxy-alpine:2.4 
+    ports:
+      - published: 80
+        target: 9000
+        protocol: tcp
+        mode: host
+      - published: 8080
+        target: 9000
+        protocol: tcp
+        mode: host
+    networks:
+      - {{ glstackdeploy_network_name }}
+    configs:
+      - source: haproxy
+        target: /usr/local/etc/haproxy/haproxy.cfg 
+        mode: 0444
+    volumes:
+      - haproxy-socket:/var/run/haproxy/:rw
+    dns: 127.0.0.11
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+  rsyslog:
+    image: jbenninghoff/rsyslog-forwarder
+    ports:
+      - published: 514
+        target: 514
+        protocol: tcp
+        mode: host
+      - published: 514
+        target: 514
+        protocol: udp
+        mode: host
+    networks:
+      - {{ glstackdeploy_network_name }}
+    configs:
+      - source: rsyslog
+        target: /etc/rsyslog.conf
+        mode: 0444
+    dns: 127.0.0.11
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+{% if glstackdeploy_deploy_cerebro %}
+  cerebro:
+    image: juanjovlc2/cerebro:latest
+    environment:
+      - "CEREBRO_BASE_PATH=/cerebro/"
+      - "CEREBRO_PORT=8000"
+    networks:
+      - {{ glstackdeploy_network_name }}
+{% endif %}
+
+networks:
+  {{ glstackdeploy_network_name }}:
+    driver: overlay
+    attachable: true
+    name: {{ glstackdeploy_network_name }}
+
+configs:
+  haproxy:
+    file: conf/haproxy.cfg
+  rsyslog:
+    file: conf/rsyslog.conf
+  graylog:
+    template_driver: golang
+    file: conf/graylog.conf
+  defaultinputs:
+    file: conf/default-inputs.json
+  escert:
+    file: tls/escert.crt
+  escertkey:
+    file: tls/escert.key
+
+secrets:
+  espasswd:
+    file: secrets/espasswd.txt
+
+volumes:
+  mongo-data-1:
+  mongo-data-2:
+  mongo-data-3:
+  mongo-config-1:
+  mongo-config-2:
+  mongo-config-3:
+  haproxy-socket:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=99"

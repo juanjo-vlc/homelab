@@ -1,0 +1,6 @@
+---
+- name: Deploy stack
+  tags: deployStack
+  hosts: docker_swarm_manager
+  roles:
+    - juanjovlc.glstackdeploy
