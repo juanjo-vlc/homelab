@@ -1,0 +1,17 @@
+version: "2"
+services:
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    volumes:
+      - ./nexus-data:/nexus-data
+    restart: on-failure 
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./nginx/tls:/etc/nginx/tls
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8081:8081
+    restart: on-failure 
