@@ -1,0 +1,11 @@
+{{ glstackdeploy_es_graylog_rolename }}:
+  cluster: 
+    - monitor
+    - manage_index_templates
+  indices: 
+    - names:
+      - 'gl-events_*'
+      - 'gl-system-events_*'
+      - 'graylog_*'
+      privileges: 
+        - all

@@ -1,0 +1,35 @@
+diff -ru a/atosatto.docker-swarm/tasks/setup-swarm-labels.yml b/atosatto.docker-swarm/tasks/setup-swarm-labels.yml
+--- a/atosatto.docker-swarm/tasks/setup-swarm-labels.yml	2020-05-08 13:29:54.000000000 +0200
++++ b/atosatto.docker-swarm/tasks/setup-swarm-labels.yml	2021-07-24 19:40:51.772921624 +0200
+@@ -3,7 +3,7 @@
+ - name: Get list of labels.
+   command: >-
+          docker inspect
+-         --format {% raw %}'{{ range $key, $value := .Spec.Labels }}{{ printf "%s\n" $key }}{{ end }}'{% endraw %}
++         --format {% raw %}'{{ range $key, $value := .Spec.Labels }}{{ printf "%s=%s\n" $key $value}}{{ end }}'{% endraw %}
+          {{ ansible_fqdn|lower }}
+   register: docker_swarm_labels
+   changed_when: false
+@@ -13,17 +13,18 @@
+     - swarm_labels
+ 
+ - name: Remove labels from swarm node.
+-  command: docker node update --label-rm {{ item }} {{ ansible_fqdn|lower }}
++  command: docker node update --label-rm {{ item.split('=')[0] }} {{ ansible_fqdn|lower }}
+   with_items: "{{ docker_swarm_labels.stdout_lines }}"
+-  when: item not in swarm_labels
++  when: 
++    - item.replace('=true', '') not in swarm_labels
+   delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+   delegate_facts: true
+   tags:
+     - swarm_labels
+ 
+ - name: Assign labels to swarm nodes if any.
+-  command: docker node update --label-add {{ item }}=true {{ ansible_fqdn|lower }}
+-  when: item not in docker_swarm_labels.stdout_lines
++  command: docker node update --label-add {{ (item.find('=') > 0) | ternary( item , item ~ "=true") }} {{ ansible_fqdn|lower }}
++  when: (item.find('=') > 0) | ternary( item , item ~ "=true") not in docker_swarm_labels.stdout_lines
+   with_items:
+     - "{{ swarm_labels  | default([]) }}"
+   delegate_to: "{{ groups['docker_swarm_manager'][0] }}"

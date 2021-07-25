@@ -1,0 +1,12 @@
+$MaxMessageSize 64k
+
+module(load="imudp")
+input(type="imudp" port="514")
+
+module(load="imtcp")
+input(type="imtcp" port="514")
+
+$ActionForwardDefaultTemplateName RSYSLOG_SyslogProtocol23Format
+$ActionSendTCPRebindInterval 3000
+
+*.* @@haproxy:12201

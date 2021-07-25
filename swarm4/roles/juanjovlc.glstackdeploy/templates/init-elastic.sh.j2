@@ -1,0 +1,19 @@
+docker run --rm --network {{ glstackdeploy_network_name }} {{ glstackdeploy_curl_image }} -X POST -u "elastic:{{ glstackdeploy_es_elastic_password }}" "http://esdata-hot:9200/_xpack/security/role/graylog?pretty" -H 'Content-Type: application/json' -d'
+{
+  "cluster": [ "monitor", "manage_index_templates" ],
+  "indices": [
+    {
+      "names": [ "gl-events_*", "gl-system-events_*", "graylog_*" ],
+      "privileges": [ "all" ]
+    }
+  ]
+}
+'
+
+docker run --rm --network {{ glstackdeploy_network_name }} {{ glstackdeploy_curl_image }} -X POST -u "elastic:{{ glstackdeploy_es_elastic_password }}" "http://esdata-hot:9200/_security/user/{{ glstackdeploy_gl_elasticsearch_username }}?pretty" -H 'Content-Type: application/json' -d'
+{
+  "password" : "{{ glstackdeploy_gl_elasticsearch_password }}",
+  "roles" : [ "graylog"],
+  "full_name" : "Graylog User"
+}
+'

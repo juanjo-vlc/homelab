@@ -1,0 +1,88 @@
+---
+
+- name: Create a custom Swarm network.
+  docker_network:
+    name: docker_gwbridge
+    driver_options:
+      com.docker.network.bridge.enable_icc: "false"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.name: docker_gwbridge
+    ipam_options:
+      subnet: "{{ docker_swarm_network }}"
+      gateway: "{{ docker_swarm_network | ipaddr('net') | ipaddr('1') | ipaddr('ip') }}"
+  when: docker_swarm_network is defined and docker_swarm_network | ipaddr('net')
+
+- name: Check if "Swarm Mode" is enabled.
+  shell: docker info
+  changed_when: false
+  register: docker_info
+  tags:
+    - skip_ansible_lint  # Suppressing the linter
+
+- name: Init "Swarm Mode" on the first manager.
+  shell: docker swarm init
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and inventory_hostname == groups['docker_swarm_manager'][0]"
+  tags:
+    - skip_ansible_lint  # Suppressing the linter
+
+- name: Get the worker join-token.
+  shell: docker swarm join-token -q worker
+  changed_when: false
+  register: docker_worker_token
+  delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+  delegate_facts: true
+  when: "'docker_swarm_worker' in group_names"
+  tags:
+    - skip_ansible_lint  # Suppressing the linter
+
+- name: Get the manager join-token.
+  shell: docker swarm join-token -q manager
+  changed_when: false
+  register: docker_manager_token
+  delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+  delegate_facts: true
+  when: "'docker_swarm_manager' in group_names
+    and inventory_hostname != groups['docker_swarm_manager'][0]"
+  tags:
+    - skip_ansible_lint  # Suppressing the linter
+
+- name: Declare the address of the first Swarm manager as a fact.
+  set_fact:
+    docker_manager_address: "{{ docker_swarm_addr }}:{{ docker_swarm_port }}"
+  when: "inventory_hostname == groups['docker_swarm_manager'][0]"
+
+- name: Distribute the fact containing address of the first Swarm manager.
+  set_fact:
+    docker_manager_address: "{{ hostvars[groups['docker_swarm_manager'][0]]['docker_manager_address'] }}"
+  when: "inventory_hostname != groups['docker_swarm_manager'][0]"
+
+- name: Join the pending Swarm worker nodes.
+  shell: docker swarm join
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+        --token "{{ docker_worker_token.stdout }}"
+        {{ docker_manager_address }}
+  changed_when: false
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and docker_info.stdout.find('Swarm: pending') == -1
+    and 'docker_swarm_worker' in group_names
+    and 'docker_swarm_manager' not in group_names"
+  tags:
+    - skip_ansible_lint  # Suppressing the linter
+
+- name: Join the pending Swarm manager nodes.
+  shell: docker swarm join
+        --listen-addr {{ docker_swarm_addr }}:{{ docker_swarm_port }}
+        --advertise-addr {{ docker_swarm_addr }}
+        --token "{{ docker_manager_token.stdout }}"
+        {{ docker_manager_address }}
+  changed_when: false
+  when: "docker_info.stdout.find('Swarm: active') == -1
+    and docker_info.stdout.find('Swarm: pending') == -1
+    and 'docker_swarm_manager' in group_names
+    and inventory_hostname != groups['docker_swarm_manager'][0]"
+  tags:
+    - skip_ansible_lint  # Suppressing the linter

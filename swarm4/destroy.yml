@@ -1,0 +1,45 @@
+---
+- name: A playbook to kill them all
+  hosts: docker_swarm_manager 
+  vars_prompt:
+    - name: stackname
+      prompt: Name of the stack?
+      private: no
+  tasks:
+    - name: Destroy the stack
+      community.docker.docker_stack:
+        name: "{{ stackname }}"
+        state: absent
+      run_once: yes
+
+- name: Destroy datadirs and volumes
+  hosts: all
+  vars_prompt:
+    - name: stackname
+      prompt: Name of the stack?
+      private: no
+  tasks:
+    - name: Destroy dirs
+      file:
+        path: /dockerdata/{{ item }}
+        state: absent
+      loop:
+        - kibana
+        - elasticsearch
+        - mongo
+        - graylog
+  
+    - name: Destroy volumes
+      community.docker.docker_volume:
+        volume_name: "{{ stackname }}_{{ item }}"
+        state: absent
+      loop:
+        - haproxy-socket
+        - mongo-config-1
+        - mongo-data-1
+        - mongo-config-2
+        - mongo-data-2
+        - mongo-config-3
+        - mongo-data-3
+
+

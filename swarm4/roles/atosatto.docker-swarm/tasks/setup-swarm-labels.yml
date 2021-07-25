@@ -1,0 +1,33 @@
+---
+
+- name: Get list of labels.
+  command: >-
+         docker inspect
+         --format {% raw %}'{{ range $key, $value := .Spec.Labels }}{{ printf "%s=%s\n" $key $value}}{{ end }}'{% endraw %}
+         {{ ansible_fqdn|lower }}
+  register: docker_swarm_labels
+  changed_when: false
+  delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+  delegate_facts: true
+  tags:
+    - swarm_labels
+
+- name: Remove labels from swarm node.
+  command: docker node update --label-rm {{ item.split('=')[0] }} {{ ansible_fqdn|lower }}
+  with_items: "{{ docker_swarm_labels.stdout_lines }}"
+  when: 
+    - item.replace('=true', '') not in swarm_labels
+  delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+  delegate_facts: true
+  tags:
+    - swarm_labels
+
+- name: Assign labels to swarm nodes if any.
+  command: docker node update --label-add {{ (item.find('=') > 0) | ternary( item , item ~ "=true") }} {{ ansible_fqdn|lower }}
+  when: (item.find('=') > 0) | ternary( item , item ~ "=true") not in docker_swarm_labels.stdout_lines
+  with_items:
+    - "{{ swarm_labels  | default([]) }}"
+  delegate_to: "{{ groups['docker_swarm_manager'][0] }}"
+  delegate_facts: true
+  tags:
+    - swarm_labels

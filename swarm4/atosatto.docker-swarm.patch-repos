@@ -1,0 +1,56 @@
+diff -ru a/atosatto.docker-swarm/tasks/setup-containerd.yml b/atosatto.docker-swarm/tasks/setup-containerd.yml
+--- a/atosatto.docker-swarm/tasks/setup-containerd.yml	2020-05-08 13:29:54.000000000 +0200
++++ b/atosatto.docker-swarm/tasks/setup-containerd.yml	2021-06-15 00:16:38.705861484 +0200
+@@ -18,14 +18,6 @@
+   package:
+     name: "{{ containerd_package_name }}{{ _containerd_package_version | default('') }}"
+     state: "{{ containerd_package_state }}"
+-  when: ansible_os_family != 'RedHat'
+-    or (ansible_os_family == 'RedHat' and ansible_distribution_major_version != '8')
+-
+-- name: Install containerd on RHEL 8.
+-  package:
+-    name: "https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.6-3.3.el7.x86_64.rpm"
+-    state: "{{ containerd_package_state }}"
+-  when: ansible_os_family == 'RedHat' and ansible_distribution_major_version == '8'
+ 
+ - block:
+diff -ru a/atosatto.docker-swarm/vars/main.yml b/atosatto.docker-swarm/vars/main.yml
+--- a/atosatto.docker-swarm/vars/main.yml	2020-05-08 13:29:54.000000000 +0200
++++ b/atosatto.docker-swarm/vars/main.yml	2021-06-13 09:06:23.301258602 +0200
+@@ -6,7 +6,7 @@
+ # Docker CE stable release repository
+ docker_repo_ce_stable:
+   name: "docker_ce_stable"
+-  yum_repo: "https://download.docker.com/linux/centos/7/$basearch/stable"
++  yum_repo: "https://download.docker.com/linux/centos/$releasever/$basearch/stable"
+   yum_gpg_key: "https://download.docker.com/linux/centos/gpg"
+   yum_gpg_check: "yes"
+   apt_repo: "deb [arch={{ docker_architecture[ansible_architecture] }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+@@ -16,7 +16,7 @@
+ # Docker CE edge release repository
+ docker_repo_ce_edge:
+   name: "docker_ce_edge"
+-  yum_repo: "https://download.docker.com/linux/centos/7/$basearch/edge"
++  yum_repo: "https://download.docker.com/linux/centos/$releasever/$basearch/edge"
+   yum_gpg_key: "https://download.docker.com/linux/centos/gpg"
+   yum_gpg_check: "yes"
+   apt_repo: "deb [arch={{ docker_architecture[ansible_architecture] }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} edge"
+@@ -26,7 +26,7 @@
+ # Docker CE test release repository
+ docker_repo_ce_test:
+   name: "docker_ce_test"
+-  yum_repo: "https://download.docker.com/linux/centos/7/$basearch/test"
++  yum_repo: "https://download.docker.com/linux/centos/$releasever/$basearch/test"
+   yum_gpg_key: "https://download.docker.com/linux/centos/gpg"
+   yum_gpg_check: "yes"
+   apt_repo: "deb [arch={{ docker_architecture[ansible_architecture] }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} test"
+@@ -36,7 +36,7 @@
+ # Docker CE nightly release repository
+ docker_repo_ce_nightly:
+   name: "docker_ce_nightly"
+-  yum_repo: "https://download.docker.com/linux/centos/7/$basearch/nightly"
++  yum_repo: "https://download.docker.com/linux/centos/$releasever/$basearch/nightly"
+   yum_gpg_key: "https://download.docker.com/linux/centos/gpg"
+   yum_gpg_check: "yes"
+   apt_repo: "deb [arch={{ docker_architecture[ansible_architecture] }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} nightly"

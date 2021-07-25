@@ -1,0 +1,70 @@
+
+glstackdeploy_docker_registry: ""
+
+glstackdeploy_stack_name: glstack
+glstackdeploy_network_name: graylog
+glstackdeploy_base_dir: /opt/{{ glstackdeploy_stack_name }}
+glstackdeploy_data_dir: /dockerdata
+
+
+glstackdeploy_deploy_kibana: no
+glstackdeploy_expose_kibana: no
+glstackdeploy_kibana_image: "docker.elastic.co/kibana/kibana:{{ glstackdeploy_es_version }}"
+
+glstackdeploy_deploy_cerebro: yes
+
+glstackdeploy_es_version: 7.13.1
+glstackdeploy_es_image: "docker.elastic.co/elasticsearch/elasticsearch:{{ glstackdeploy_es_version }}"
+glstackdeploy_es_master_memory_mb: 2048
+glstackdeploy_es_data_memory_mb: 2048
+glstackdeploy_es_datatypes: ['hot', 'warm']
+glstackdeploy_es_certificate_password: 'changeme'
+glstackdeploy_es_certifcate: ./tls/escert.crt
+glstackdeploy_es_certifcate_key: ./tls/escert.key
+glstackdeploy_es_security: "true"
+glstackdeploy_es_elastic_password: 'changeme'
+glstackdeploy_es_expose_elastic: yes
+glstackdeploy_es_graylog_rolename: graylogrole
+glstackdeploy_es_password_salt: 'f12b61a64f149b7a57b83u'
+
+
+
+glstackdeploy_gl_expose_master: no
+glstackdeploy_gl_version: 4.1
+
+glstackdeploy_gl_image: "{{ glstackdeploy_docker_registry }}graylog/graylog:{{ glstackdeploy_gl_version}}"
+
+glstackdeploy_gl_elasticsearch_max_size_per_index: 1073741824
+glstackdeploy_gl_elasticsearch_max_number_of_indices: 20
+glstackdeploy_gl_retention_strategy: 'delete'
+glstackdeploy_gl_elasticsearch_shards: 2
+glstackdeploy_gl_elasticsearch_replicas: 1
+glstackdeploy_gl_output_batch_size: 1000
+glstackdeploy_gl_processbuffer_processors: 2
+glstackdeploy_gl_outputbuffer_processors: 1
+glstackdeploy_gl_processor_wait_strategy: 'blocking'
+glstackdeploy_gl_inputbuffer_processors: 1
+glstackdeploy_gl_message_journal_max_size_gb: 5
+glstackdeploy_gl_prometheus_exporter_enabled: true
+glstackdeploy_gl_prometheus_exporter_bind_port: 9833
+glstackdeploy_gl_content_packs_auto_install: 'default-inputs.json'
+glstackdeploy_gl_content_packs_dir: 'data/contentpacks'
+glstackdeploy_gl_content_packs_loader_enabled: true
+glstackdeploy_gl_elasticsearch_username: grayloguser
+glstackdeploy_gl_elasticsearch_password: "changemetoo"
+glstackdeploy_gl_elasticsearch_password_crypt: '$2a$10$T1cxG6bG8JxepC63jh5.0Od8FPbtwo2dEyBQZAHodLieC074Hu6M6#'
+glstackdeploy_gl_port_range: "12200-12300"
+
+glstackdeploy_mongo_version: 4
+glstackdeploy_mongo_image: "{{ glstackdeploy_docker_registry }}mongo:{{ glstackdeploy_mongo_version }}"
+
+glstackdeploy_cerebro_version: latest
+glstackdeploy_cerebro_image: "{{ glstackdeploy_docker_registry }}juanjovlc2/cerebro:{{ glstackdeploy_cerebro_version }}"
+
+glstackdeploy_haproxy_version: 2.4
+glstackdeploy_haproxy_image: "{{ glstackdeploy_docker_registry }}haproxytech/haproxy-alpine:{{ glstackdeploy_haproxy_version}}"
+
+glstackdeploy_rsyslog_version: latest
+glstackdeploy_rsyslog_image: "{{ glstackdeploy_docker_registry }}jbenninghoff/rsyslog-forwarder:{{ glstackdeploy_rsyslog_version }}"
+
+glstackdeploy_curl_image: "curlimages/curl:7.78.0"

@@ -1,0 +1,160 @@
+---
+- name: Deploy a swarm
+  hosts: all
+  tags: deploySwarm
+  vars:
+    docker_swarm_interface: eth1
+    docker_compose_version: 1.29.2
+    containerd_service_override: |
+      [Service]
+      LimitMEMLOCK=infinity
+    docker_daemon_config:
+      "registry-mirrors": ["https://192.168.123.100:8081"]
+    glstackdeploy_use_hosted_repo: yes
+
+  pre_tasks:
+    - name: hosted yum repos
+      block:
+        - name: Setup CentOS Base proxied repo
+          yum_repository:
+            name: nexusrepo
+            description: Nexus Base Proxy
+            file: hosted-nexus
+            baseurl: 'https://192.168.123.100:8081/repository/centos-7-group'
+            enabled: 1
+            gpgcheck: 1
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+            repo_gpgcheck: 0
+            priority: 1
+
+        - name: Setup EPEL proxied repo
+          yum_repository:
+            name: nexus-epel
+            description: Nexus EPEL proxy
+            file: hosted-nexus
+            baseurl: 'https://192.168.123.100:8081/repository/centos-epel-proxy/$releasever/$basearch'
+            repo_gpgcheck: 0
+            enabled: 1
+            gpgcheck: 1
+            gpgkey: 'https://mirror.23media.com/epel/RPM-GPG-KEY-EPEL-7'
+            priority: 1
+        
+        - name: Setup Docker proxied repo
+          yum_repository:
+            name: nexus-docker
+            description: Nexus Docker proxy
+            file: hosted-nexus
+            baseurl: 'https://192.168.123.100:8081/repository/centos-docker'
+            enabled: 1
+            gpgcheck: 1
+            gpgkey: 'https://download.docker.com/linux/centos/gpg'
+            priority: 1
+
+      when: glstackdeploy_use_hosted_repo
+  
+    - name: update all
+      package:
+        name: "*"
+        state: latest
+      tags: 
+        - updatePackages
+        - never
+    - name: create group docker
+      group:
+        name: docker
+        state: present
+    - name: create user
+      user:
+        name: dockeradm
+        groups: docker
+        append: yes
+        state: present
+    - name: Set vm.max_map_count
+      sysctl:
+        name: vm.max_map_count
+        value: "262144"
+  roles:
+    - atosatto.docker-swarm
+
+- name: Create lvm volumes
+  hosts: all 
+  tags: dataVolume
+  tasks:
+    - name: install LVM programs
+      package:
+        name: lvm2
+        state: present
+    - name: Create a partition
+      parted:
+        device: /dev/sdb
+        label: gpt
+        name: dockerdata
+        number: 1
+        align: optimal
+        part_start: 0%
+        part_end: 100%
+        state: present
+        flags: [lvm]
+    - name: Create pv
+      lvg:
+        pvs: /dev/sdb1
+        vg: dockervg
+    - name: Create lvol
+      lvol:
+        lv: dockerdata
+        vg: dockervg
+        size: "100%VG" 
+        state: present
+    - name: Format lvol
+      filesystem:
+        fstype: ext4
+        dev: /dev/mapper/dockervg-dockerdata
+        opts: "-L ESDATA"
+    - name: Mount volume
+      mount:
+        src: /dev/mapper/dockervg-dockerdata
+        path: /dockerdata
+        state: mounted
+        fstype: ext4
+    - name: Create elasticsearch datadir
+      file:
+        path: /dockerdata/elasticsearch
+        owner: 1000
+        group: 1000
+        state: directory
+    - name: Create kibana datadir
+      file:
+        path: /dockerdata/kibana
+        owner: 1000
+        group: 1000
+        state: directory   
+      when: 'glstackdeploy_deploy_kibana | default(false)'
+    - name: Create graylog journal 
+      file:
+        path: /dockerdata/graylog
+        owner: 1100
+        group: 1100
+        state: directory
+
+- name: Deploy stack
+  tags: deployStack
+  hosts: docker_swarm_manager
+  vars:
+    glstackdeploy_es_version: "7.13.3"
+    glstackdeploy_es_image: "elasticsearch/elasticsearch:{{ glstackdeploy_es_version }}"
+    local_python_interpreter: /usr/bin/python3
+  pre_tasks:
+    - name: run python to crypt
+      command:
+        cmd: "{{ local_python_interpreter }} -c 'from passlib.hash import bcrypt; print(bcrypt.hash(\"{{ glstackdeploy_gl_elasticsearch_password }}\", rounds=10, ident=\"2a\"))'"
+      delegate_to: localhost
+      run_once: yes
+      register: crypted
+
+    - name: set fact output
+      set_fact:
+        glstackdeploy_gl_elasticsearch_password_crypt: "{{ crypted.stdout_lines[0] }}"
+      when: crypted is defined
+
+  roles:
+    - juanjovlc.glstackdeploy

@@ -1,0 +1,63 @@
+---
+- name: Generate a self signed certificate
+  hosts: localhost
+  gather_facts: no
+  become: no
+  vars:
+    private_key_path: ./tls/escert.key
+    private_key_password: " {{glstackdeploy_es_certificate_password | default('changeme') }}"
+    certificate_path: ./tls/escert.crt
+    csr_base_path: ./tls/
+    csr_path: "{{ csr_base_path }}/escert.csr"
+
+  tasks:
+    - name: install cryptography module
+      package:
+        name: python3-cryptography
+        state: installed
+      tags: cert
+      become: yes
+
+    - name: create a directory for csr
+      file:
+        path: "{{ csr_base_path }}"
+        state: directory
+      tags: cert
+
+    - name: generate a private key
+      community.crypto.openssl_privatekey:
+        path: "{{ private_key_path }}"
+        backup: yes
+        passphrase: "{{ private_key_password }}"
+        cipher: auto
+      tags: cert
+
+    - name: generate a CSR
+      community.crypto.openssl_csr:
+        common_name: "elasticcluster"
+        country_name: "ES"
+        locality_name: "Valencia"
+        state_or_province_name: "Valencia"
+        organization_name: "ElasticCluster"
+        organizational_unit_name: "Automation"
+        privatekey_path: "{{ private_key_path }}"
+        privatekey_passphrase: "{{ private_key_password }}"
+        subject_alt_name: 
+          - "DNS:esmaster1"
+          - "DNS:esmaster2"
+          - "DNS:esmaster3"
+          - "DNS:esdata-hot"
+          - "DNS:esdata-warm"
+          - "DNS:esdata-cold"
+        path: "{{ csr_path }}"
+        backup: yes
+      tags: cert
+
+    - name: generate a certificate
+      community.crypto.x509_certificate:
+        path: "{{ certificate_path }}"
+        privatekey_path: "{{ private_key_path }}"
+        privatekey_passphrase: "{{ private_key_password }}"
+        csr_path: "{{ csr_path }}"
+        provider: selfsigned
+      tags: cert
