@@ -115,7 +115,7 @@
 
       - name: Fake a cluster load balancer for ha setups
         lineinfile:
-          line: "10.255.255.201 apiserver.cluster.local"
+          line: "10.255.255.101 apiserver.cluster.local"
           path: /etc/hosts
 
       when: "ansible_distribution == 'Ubuntu'"
