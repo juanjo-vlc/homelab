@@ -37,3 +37,8 @@ EOF
 variable "availability_zones" {
     default = ["eu-west-1a", "eu-west-1b"]
 }
+
+variable "security_groups" {
+    default = ["sg-04cbc9fc53450397e", "sg-0d2c02f4547301136"]
+}
+  

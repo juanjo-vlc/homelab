@@ -19,12 +19,16 @@ resource "aws_launch_template" "terra1" {
   image_id               = var.image_id
   instance_type          = var.instance_type
   key_name               = var.key_name
-  vpc_security_group_ids = ["sg-04cbc9fc53450397e", "sg-0d2c02f4547301136"]
+  vpc_security_group_ids = var.security_groups
   user_data              = var.init_script
+  tags = {
+        Department = "terraform"
+        Name = "terra1_autoscaling"
+  }
 }
 
 resource "aws_autoscaling_group" "terra1" {
-  availability_zones = ["eu-west-1a"]
+  availability_zones = var.availability_zones
   desired_capacity   = var.autoscaling_capacity
   max_size           = var.autoscaling_max_size
   min_size           = var.autoscaling_min_size
@@ -38,8 +42,8 @@ resource "aws_autoscaling_group" "terra1" {
 }
 
 resource "aws_elb" "terra1" {
-  security_groups    = ["sg-04cbc9fc53450397e", "sg-0d2c02f4547301136"]
-  availability_zones = ["eu-west-1a"]
+  security_groups    = var.security_groups
+  availability_zones = var.availability_zones
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 2
