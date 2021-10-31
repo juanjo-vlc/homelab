@@ -1,0 +1,145 @@
+---
+- name: Setup K8S prerequisites on Ubuntu 20.04
+  hosts: all
+  vars:
+    k8s_version: 1.22.3
+    crio_version: 1.22
+    yq_version: v4.12.0
+    internalip_iface: eth1
+    local_registry: 192.168.123.100:8081
+
+  tasks:
+    - block:
+      - name: Install prerequisites packages
+        apt:
+          name: 
+            - apt-transport-https
+            - curl
+            - ca-certificates
+            - gpg
+          state: latest
+          update_cache: yes
+      
+      - name: configure br_netfilter module
+        lineinfile:
+          line: br_netfilter
+          path: /etc/modules-load.d/k8s.conf
+          create: yes
+          backup: yes
+      
+      - name: load br_netfilter module
+        modprobe:
+          name: br_netfilter
+          state: present
+
+      - name: setup sysctl
+        sysctl:
+          name: "{{ item }}"
+          value: '1'
+          sysctl_file: /etc/sysctl.d/10-k8s.conf 
+          reload: yes
+        loop:
+          - net.bridge.bridge-nf-call-ip6tables
+          - net.bridge.bridge-nf-call-iptables
+          - net.ipv4.ip_forward
+
+      - name: Fetch google\'s key
+        get_url:
+          url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+          dest: /usr/share/keyrings/kubernetes-archive-keyring.gpg
+          checksum: sha256:ff834d1e179c3727d9cd3d0c8dad763b0710241f1b64539a200fbac68aebff3e
+    
+      - name: Add google\'s apt repository
+        apt_repository:
+          repo: "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main"
+          filename: "kubernetes"
+
+      - name: Fetch Suse\'s libcontainers key
+        apt_key: 
+          url: https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ ansible_distribution_version }}/Release.key          
+          state: present
+
+      - name: Fetch Suse\'s cri-o key
+        apt_key:
+          url: https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:{{ crio_version }}/xUbuntu_{{ ansible_distribution_version }}/Release.key
+          state: present
+
+      - name: Add opensuse\'s apt repository
+        apt_repository:
+          repo: "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ ansible_distribution_version }}/ /"
+          filename: "kubernetes"          
+          state: present
+      
+      - name: Add opensuse\'s cri-o apt repository
+        apt_repository:
+          repo: "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/{{ crio_version }}/xUbuntu_{{ ansible_distribution_version }}/ /" 
+          filename: "kubernetes"
+          state: present
+
+      - name: Install kubernetes packages
+        apt:
+          name:
+            - cri-o
+            - cri-o-runc
+            - kubeadm={{ k8s_version }}-00
+            - kubectl={{ k8s_version }}-00
+            - kubelet={{ k8s_version }}-00
+          state: present
+          update_cache: yes
+
+      - name: Enable cri-o service
+        service:
+          name: crio
+          state: started
+          enabled: yes
+      
+      - name: Install yq
+        get_url:
+          url: https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_amd64
+          dest: /usr/local/bin/yq
+          mode: 0755
+          checksum: sha256:8716766cb49ab9dd7df5622d80bb217b94a21d0f3d3dc3d074c3ec7a0c7f67ea
+
+      - name: Setup correct internalIp in kubelets
+        template: 
+          src: ./templates/09-extra-args.conf.j2
+          dest: /etc/systemd/system/kubelet.service.d/09-extra-args.conf
+        notify: reload systemd
+
+      - name: Setup custom registries
+        template:
+          src: ./templates/registries.conf.j2
+          dest: /etc/containers/registries.conf
+          backup: yes
+        when: 'local_registry is defined'
+
+      - name: Fake a cluster load balancer DNS entry for ha setups
+        lineinfile:
+          line: "192.168.123.100 anthrax.garmo.local"
+          path: /etc/hosts
+
+      - name: Add a custom route for k8s networking
+        copy:
+          content: |
+            network:
+              version: 2
+              renderer: networkd
+              ethernets:
+                eth1:
+                  routes:
+                    - to: 10.96.0.0/16
+                      via: 0.0.0.0
+              
+
+          dest: /etc/netplan/99-k8s-routes.yaml
+        notify: 'Apply netplan'
+
+      when: "ansible_distribution == 'Ubuntu'"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+    - name: Apply netplan
+      command:
+        cmd: netplan apply

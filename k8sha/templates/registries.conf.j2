@@ -1,0 +1,8 @@
+#{{ ansible_managed }}
+unqualified-search-registries = ["{{ local_registry }}"]
+
+[[registry]]
+prefix = "k8s.gcr.io"
+insecure = false
+blocked = false
+location = "k8s.gcr.io"

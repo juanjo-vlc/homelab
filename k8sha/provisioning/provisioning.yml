@@ -1,0 +1,60 @@
+---
+- name: Vagrant provisioning
+  hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+    - name: add cotterpin user
+      user:
+        name: cotterpin
+        comment: Automation user
+        password: "{{ 'thisisnotsafe' |password_hash('sha512', 'salt') }}"
+ 
+    - name: setup cotterpin ssh key
+      authorized_key:
+        user: cotterpin 
+        key: "{{ lookup('file', './keys/cotterpin-id_rsa.pub') }}"
+ 
+    - name: setup juanjo ssh key for cotterpin
+      authorized_key:
+        user: cotterpin 
+        key: "{{ lookup('file', './keys/juanjo-id_rsa.pub') }}"
+ 
+    - name: setup sudoers
+      copy:
+        dest: /etc/sudoers.d/cotterpin
+        content: "cotterpin ALL=(ALL) NOPASSWD:ALL"
+ 
+    - name: install anthrax ca CentOS/RedHat
+      copy:
+        src: tls/anthraxca.crt
+        dest: /etc/pki/ca-trust/source/anchors/anthraxca.crt
+      notify: update ca trust
+      when: "ansible_distribution != 'Ubuntu'"
+
+    - name: install anthax ca Ubuntu
+      copy:
+        src: tls/anthraxca.crt
+        dest: /usr/local/share/ca-certificates/anthraxca.crt
+      notify: update ca-certificates
+      when: "ansible_distribution == 'Ubuntu'"
+    
+    - name: Setup vim
+      copy:
+        content: |
+          set nocompatible
+          autocmd FileType yaml setlocal ai ts=2 sw=2 et nu colorcolumn=1,3,5,7,9,11,13
+          set background=dark
+          filetype plugin indent on
+          set smartcase
+        dest: /etc/vim/vimrc.local
+        backup: yes
+ 
+  handlers:
+    - name: update ca trust
+      command:
+        cmd: update-ca-trust 
+    - name: update ca-certificates
+      command:
+        cmd: update-ca-certificates
+ 
