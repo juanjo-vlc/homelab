@@ -1,0 +1,46 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+ENV['VAGRANT_EXPERIMENTAL'] = 'disks'
+ENV["LC_ALL"] = "en_US.UTF-8"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/oracle8"
+  #config.vm.box = "centos-8-stream-docker-ce"
+  
+  config.vm.provision :ansible do |ansible|
+    ansible.playbook = "provisioning/provisioning.yml"
+  end
+
+  (1..5).each do |i|
+    config.vm.define "k8snode#{i}" do |node|
+      node.vm.hostname = "k8snode#{i}"
+      node.vm.network "private_network", ip: "10.255.255.20#{i}", virtualbox__intnet: "k8snet"
+      node.vm.network "public_network", ip: "192.168.123.20#{i}", bridge: "eno1"
+
+      #node.vm.disk :disk, size: "20GB", primary: false, name: "data"
+
+      node.vm.provider "virtualbox" do |vb|
+        # Use linked images instead of copying the base for
+        # each vm
+        vb.linked_clone = true
+
+        # Display the VirtualBox GUI when booting the machine
+        vb.gui = false 
+
+        # Set up the VM's name
+        vb.name = "k8snode#{i}"
+
+        # Don't check for guest additions
+        vb.check_guest_additions = false 
+    
+        # Customize the amount of memory on the VM:
+        vb.memory = "6144"
+        # Customize the amount of vcpus
+        vb.cpus = "2"
+
+	vb.customize ["modifyvm", :id, "--groups", "/k8s-oracle"]
+        vb.customize ["modifyvm", :id, "--audio", "none" ]
+      end
+    end
+  end
+end

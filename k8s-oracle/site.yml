@@ -1,0 +1,142 @@
+---
+
+# (c) Wong Hoi Sing Edison <hswong3i@pantarei-design.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- hosts: all
+  become: true
+  tasks:
+    - name: include role runc
+      include_role:
+        name: runc
+      tags: runc
+
+    - name: include role crun
+      include_role:
+        name: crun
+      tags: crun
+
+    - name: include role containers_common
+      include_role:
+        name: containers_common
+      tags: containers_common
+
+    - name: include role containernetworking_plugins
+      include_role:
+        name: containernetworking_plugins
+      tags: containernetworking_plugins
+
+    - name: include role conmon
+      include_role:
+        name: conmon
+      tags: conmon
+
+    - name: include role cri-o
+      include_role:
+        name: cri-o
+      tags: cri-o
+  tags: containerRuntime
+
+---
+- name: Site 2
+  hosts: all
+  become: yes  
+  vars:
+    yq_version: v4.12.0
+    internalip_iface: eth1
+    local_registry: anthrax.garmo.local:8081
+  tasks:
+    - block:
+      - name: Install kubeadm
+        package:
+          name: 
+            - kubernetes-kubeadm
+            - kubernetes-kubelet
+            - kubernetes-kubectl
+            - iproute-tc
+            - cri-tools
+          state: present
+      - name: Setup firewalld Interface
+        firewalld:
+          zone: trusted
+          interface: eth1
+          state: enabled
+          permanent: yes
+          immediate: yes
+      - name: Setup firewalld apiserver service
+        firewalld:
+          service: kube-apiserver
+          state: enabled
+          permanent: yes
+          immediate: yes
+      - name: Setup firewalld ports
+        firewalld:
+          port: 10250/tcp
+          state: enabled
+          permanent: yes
+          immediate: yes
+      - name: Disable swap
+        command:
+          cmd: "swapoff -a"
+      - name: Remove swap from /etc/fstab
+        lineinfile:
+          regexp: "swap"
+          state: absent
+          path: /etc/fstab
+      
+      - name: Create override directory
+        file:
+          path: /etc/systemd/system/kubelet.service.d
+          state: directory
+
+      - name: Setup correct internalIp in kubelets
+        template: 
+          src: ./templates/09-extra-args.conf.j2
+          dest: /etc/systemd/system/kubelet.service.d/09-extra-args.conf
+        notify: reload systemd
+
+      - name: Setup custom registries
+        template:
+          src: ./templates/registries.conf.j2
+          dest: /etc/containers/registries.conf
+          backup: yes
+        when: 'local_registry is defined'
+
+      - name: Start kubelet
+        service:
+          name: kubelet
+          state: started
+          enabled: yes
+  
+      - name: Add a custom route for k8s networking (RedHat)
+        template:
+          src: ./templates/route-if.j2
+          dest: /etc/sysconfig/network-scripts/route-{{ internalip_iface }}
+        notify: set static route at runtime
+      when: "ansible_os_family == 'RedHat'"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: set static route at runtime
+      command:
+        cmd: "ip route add 10.96.0.0/16 dev {{ internalip_iface }}"
+    
+    - name: Apply netplan
+      command:
+        cmd: netplan apply
+  tags: installKubeTools
+  

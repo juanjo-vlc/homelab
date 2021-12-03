@@ -1,0 +1,14 @@
+k8snode1
+k8snode2
+k8snode3
+k8snode4
+k8snode5
+
+[cluster_managers]
+k8snode1
+k8snode2
+k8snode3
+
+[cluster_workers]
+k8snode4
+k8snode5
