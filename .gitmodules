@@ -1,9 +1,6 @@
 [submodule "iac"]
 	path = iac
 	url = ssh://git@192.168.123.100:8122/juanjo/iac.git
-[submodule "k8s-kubespray/kubespray"]
-	path = k8s-kubespray/kubespray
-	url = https://github.com/kubernetes-sigs/kubespray.git
 [submodule "rancher/rancher_managed_playbook"]
 	path = rancher/rancher_managed_playbook
 	url = git@github.com:juanjo-vlc/rancher_managed_playbook.git
