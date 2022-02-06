@@ -1,48 +1,12 @@
-# applied_cluster_id:
-# applied_cluster_ingress:
-# applied_cluster_networkpolicy:
-# applied_cluster_psp_template:
-# applied_cluster_version:
-# cluster_agent_version:
-cluster_api_key: 'token-g55jm:hlprxnvwvnrch5chwdhnl9tnx8bdfmkj2x2dpsj6j8k7wtqp954qhv'
-# clusterData.id:
-# cluster_enable_network_policy:
-# clusteridentifier:
-cluster_kubernetes_version: "v1.22.5-rancher2-1"
-# cluster_name:
-# cluster_new.json:
-# clusternodecommand:
-# cluster_rancher_api:
-cluster_rancher_manager_host: rnc-lab-mgmt.dev
-# clusterregistrationtoken:
-# clusters_default_psp:
-# clusters_ingress_provider:
-# clusters_ingress_provider:
-# cluster_self_signed_certificate:
-# cluster_verify_ssl:
-# custom_cluster_name:
-# enable_cluster_alerting:
-# enable_cluster_monitoring:
-# helm_url:
-# helm_version:
-
 # Should be in roles/nodes_preq/defaults/main.yml
 # Helm
-# helm_version: "v3.5.3"
-# helm_url: https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz
-# http_proxy: ''
-# https_proxy:
-# no_proxy:
+helm_version: "v3.5.3"
+helm_url: https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz
+http_proxy: ''
+https_proxy:
+no_proxy:
 
-# kubeconfig_root_dir:
-# network_plugin:
-# newclusterRegistrationToken.json.token:
-
-# qnap_nfshost:
-# qnap_pass|b64encode:
-# qnap_provisioner_image:
-# qnap_shared_volume:
-# qnap_storage_class_name:
-# qnap_url:
-# qnap_user:
-# role:
+cluster_api_key: 'token-g55jm:hlprxnvwvnrch5chwdhnl9tnx8bdfmkj2x2dpsj6j8k7wtqp954qhv'
+cluster_kubernetes_version: "v1.22.5-rancher2-1"
+cluster_name: downstream_cluster
+cluster_rancher_manager_host: rnc-lab-mgmt.dev
