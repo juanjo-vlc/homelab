@@ -1,0 +1,23 @@
+# Should be in roles/nodes_preq/defaults/main.ym
+helm_version: v3.5.3
+helm_url: https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz
+
+# Should be in roles/rnc-mgmt/defaults/main.yml
+cluster_debugging_enabled: false
+custom_k8s_cluster_rancher_replicas: 3
+rancher_chart_release: "rancher-stable"
+rancher_chart_url: "https://releases.rancher.com/server-charts/stable"
+rancher_image_tag: "v2.6-head"
+http_proxy: ''
+no_proxy: ''
+
+# Should have a default in roles/rke2/defaults/main.yml
+rke2_type: server
+
+# Customizable values for deployments
+custom_k8s_cluster_rancher_host: rnc-lab-mgmt.dev
+kube_api_lb_host: "{{ custom_k8s_cluster_rancher_host }}"
+lbr_interface: eth1
+lbr_ipv4: 192.168.123.229
+rke2_cluster_group_name: manager_cluster
+rke2_servers_group_name: masters

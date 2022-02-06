@@ -1,0 +1,75 @@
+---
+- name: Register vms
+  hosts: all
+  become: true
+  vars_prompt:
+    - name: rhsm_username
+      prompt: Red Hat Subscription Manager username
+      private: no
+    - name: rhsm_password
+      prompt: Red Hat Subscription Manager password
+      private: yes
+  vars:
+    default_gw: 192.168.123.1
+
+  tasks:
+    - name: Register with Red Hat
+      redhat_subscription:
+        state: present
+        username: "{{ rhsm_username }}"
+        password: "{{ rhsm_password }}"
+        auto_attach: yes
+      when: "ansible_distribution == 'RedHat'"
+
+    - name: Remove epel
+      yum:
+        name: "epel-release"
+        state: absent
+      tags:
+        - never
+
+    - name: Install epel-release
+      yum:
+        name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
+        state: present
+      tags:
+        - never
+
+    - name: Remove default route assignment through vagrant NAT interface
+      lineinfile:
+        line: DEFROUTE=no
+        regexp: "^DEFROUTE="
+        state: present
+        path: /etc/sysconfig/network-scripts/ifcfg-eth0
+      tags:
+        - vagrant-routes
+      notify: restart network
+
+    - name: Enable default route assignment through bridged interface
+      lineinfile:
+        line: DEFROUTE=yes
+        regexp: "^DEFROUTE="
+        state: present
+        path: /etc/sysconfig/network-scripts/ifcfg-eth1
+      tags:
+        - vagrant-routes
+      notify: restart network
+
+    - name: Add default gateway on bridged interface
+      lineinfile:
+        line: GATEWAY={{ default_gw }}
+        regexp: "^GATEWAY="
+        state: present
+        path: /etc/sysconfig/network-scripts/ifcfg-eth1
+      tags:
+        - vagrant-routes
+      notify: restart network
+
+    - name: Update all packages
+      yum:
+        name: "*"
+        state: latest
+
+  handlers:
+    - name: restart network
+      reboot:

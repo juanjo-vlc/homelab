@@ -1,0 +1,6 @@
+[masters]
+ranchermgr[1:3]
+
+[manager_cluster:children]
+masters
+

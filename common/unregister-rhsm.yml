@@ -1,0 +1,20 @@
+---
+- name: Register vms
+  hosts: all
+  become: true
+  vars_prompt:
+    - name: rhsm_username
+      prompt: Red Hat Subscription Manager username
+      private: no
+    - name: rhsm_password
+      prompt: Red Hat Subscription Manager password
+      private: yes
+
+  tasks:
+    - name: Unregister from Red Hat
+      redhat_subscription:
+        state: absent
+        username: "{{ rhsm_username }}"
+        password: "{{ rhsm_password }}"
+        auto_attach: yes
+      when: "ansible_distribution == 'RedHat'"

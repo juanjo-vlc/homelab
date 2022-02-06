@@ -1,0 +1,9 @@
+[masters]
+k8snode[1:3]
+
+[workers]
+k8snode[4:5]
+
+[k8s_cluster:children]
+masters
+workers
