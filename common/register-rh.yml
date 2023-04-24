@@ -11,6 +11,7 @@
       private: yes
   vars:
     default_gw: 192.168.123.1
+    network_iface: eth1
 
   tasks:
     - name: Register with Red Hat
@@ -20,6 +21,8 @@
         password: "{{ rhsm_password }}"
         auto_attach: yes
       when: "ansible_distribution == 'RedHat'"
+      tags:
+        - register
 
     - name: Remove epel
       yum:
@@ -50,7 +53,7 @@
         line: DEFROUTE=yes
         regexp: "^DEFROUTE="
         state: present
-        path: /etc/sysconfig/network-scripts/ifcfg-eth1
+        path: /etc/sysconfig/network-scripts/ifcfg-{{ network_iface }}
       tags:
         - vagrant-routes
       notify: restart network
@@ -60,7 +63,7 @@
         line: GATEWAY={{ default_gw }}
         regexp: "^GATEWAY="
         state: present
-        path: /etc/sysconfig/network-scripts/ifcfg-eth1
+        path: /etc/sysconfig/network-scripts/ifcfg-{{ network_iface }}
       tags:
         - vagrant-routes
       notify: restart network

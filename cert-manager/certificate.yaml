@@ -1,0 +1,20 @@
+# certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: www
+spec:
+  secretName: www-tls
+  privateKey:
+    rotationPolicy: Always
+  commonName: $DOMAIN_NAME
+  dnsNames:
+    - $DOMAIN_NAME
+    - www.$DOMAIN_NAME
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
