@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "django-project"
+version = "0.1.0"
+description = ""
+authors = ["Juanjo Garcia <juanjo@garciaamaya.com>"]
+readme = "README.md"
+packages = [{include = "django_project", from = "src"}]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+django = "^5.2.1"
+psycopg = {extras = ["binary"], version = "^3.2.9"}
+djangorestframework = "^3.16.0"
+django-redis = "^5.4.0"
+environs = "^14.2.0"
+django-health-check = "^3.18.3"
+mod-wsgi = "^5.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

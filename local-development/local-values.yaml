@@ -1,0 +1,20 @@
+image:
+  repository: django-project
+  tag: latest
+
+service:
+  type: NodePort
+  port: 8000
+
+env:
+  - name: DB_NAME
+    value: djangoproject
+  - name: DB_USER
+    value: djangouser
+  - name: DB_HOST
+    value: database.postgres.svc.cluster.local
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: django-secret
+        key: DB_PASSWORD

@@ -1,0 +1,33 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: local-development
+build:
+  local:
+    push: false
+  artifacts:
+    - image: djangoproject
+      context: django_project
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        infer:
+          - 'src/**/*.py'
+deploy:
+  helm:
+    releases:
+      - name: django-project-chart
+        chartPath: ./django-project-chart
+        valuesFiles:
+          - local-values.yaml
+        setValueTemplates:
+          image.repository: "{{.IMAGE_REPO_djangoproject}}"
+          image.tag: "{{.IMAGE_TAG_djangoproject}}@{{.IMAGE_DIGEST_djangoproject}}"
+        namespace: django-project
+portForward:
+  - resourceType: service
+    resourceName: django-project-chart
+    port: 8000
+    localPort: 8000
+    namespace: django-project
+
