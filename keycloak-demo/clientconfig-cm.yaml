@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clientconfig
+  namespace: keycloak
+data:
+  auth.clientConfiguration.json: |
+    {
+      "stsServer": "https://keycloak.minikube/realms/myrealm",
+      "redirect_url": "https://oidcdemo.minikube/",
+      "client_id": "demoapp",
+      "pres_req_conf_id": "verified-email",
+      "response_type": "code",
+      "scope": "openid profile",
+      "post_logout_redirect_uri": "https://oidcdemo.minikube/",
+      "start_checksession": true,
+      "silent_renew": true,
+      "silent_renew_url": "http://oidcdemo.minikube/silent-renew.html",
+      "post_login_route": "/home",
+      "forbidden_route": "/home",
+      "unauthorized_route": "/home",
+      "log_console_warning_active": true,
+      "log_console_debug_active": true,
+      "max_id_token_iat_offset_allowed_in_seconds": 10,
+      "auto_userinfo": false
+    }

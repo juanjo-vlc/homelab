@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: oidcdemo
+  name: oidcdemo
+  namespace: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oidcdemo
+  template:
+    metadata:
+      labels:
+        app: oidcdemo
+    spec:
+      containers:
+      - image: docker.io/juanjovlc2/oidcdemo:latest
+        name: oidcdemo
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+          - name: tmpdir
+            mountPath: /run
+          - name: clientconfig
+            mountPath: /usr/share/nginx/html/assets/
+      volumes:
+        - name: tmpdir
+          emptyDir: {}
+        - name: clientconfig
+          configMap:
+            name: clientconfig
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oidcdemo
+  namespace: keycloak
+spec:
+  type: ClusterIP
+  selector:
+    app: oidcdemo
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+   

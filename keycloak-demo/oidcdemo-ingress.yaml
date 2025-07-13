@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oidcdemo
+  namespace: keycloak
+  annotations:
+    cert-manager.io/cluster-issuer: "minikube-ca"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - oidcdemo.minikube
+      secretName: oidcdemo.tls
+  rules:
+    - host: oidcdemo.minikube
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oidcdemo
+                port:
+                  name: http

@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+---
+kind: "postgresql"
+apiVersion: "acid.zalan.do/v1"
+
+metadata:
+  name: "database"
+  namespace: "postgres"
+  labels:
+    team: acid
+spec:
+  teamId: "acid"
+  postgresql:
+    version: "17"
+  numberOfInstances: 1
+  maintenanceWindows:
+  volume:
+    size: "10Gi"
+  users:
+    dbuser: []
+  databases:
+    myproject: dbuser
+  allowedSourceRanges:
+    # IP ranges to access your cluster go here
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+
