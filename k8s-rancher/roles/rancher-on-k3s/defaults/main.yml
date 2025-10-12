@@ -1,0 +1,26 @@
+---
+# defaults file for rancher-on-k3s
+kubeconfig: ~/.kube/anthrax.yaml
+rancher_chart_version: "v2.12.2"
+rancher_hostname: "rancher.garmo.local"
+rancher_bootstrap_password: ""
+rancher_privateca_pem: "{{ lookup('file', 'files/tls/ca.crt')}}"
+
+certmanager_chart_version: "v1.19.0"
+certmanager_cluster_issuer_name: rancher-subca
+certmanager_subca_crt: "{{ lookup('file', 'files/tls/subca.crt')}}"
+certmanager_subca_key: "{{ lookup('file', 'files/tls/subca.key')}}"
+
+ingress_nginx_chart_version: "4.13.3"
+ingress_nginx_nodeport_http: 30274
+ingress_nginx_nodeport_https: 30275
+
+longhorn_chart_version: "1.10.0"
+longhorn_hostname: "longhorn.garmo.local"
+
+minio_chart_version: "5.4.0"
+minio_hostname: "minio.garmo.local"
+minio_console_hostname: "minio-console.garmo.local"
+minio_storage_size: "5Gi"
+
+postgres_operator_chart_version: "1.14.0"

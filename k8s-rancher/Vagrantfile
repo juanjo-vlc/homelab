@@ -1,0 +1,52 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+ENV['VAGRANT_EXPERIMENTAL'] = 'disks'
+ENV["LC_ALL"] = "en_US.UTF-8"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "noble64"
+  config.vm.cloud_init content_type: "text/cloud-config", path: "./user-data.yaml"
+
+  config.vm.provision :ansible do |ansible|
+    ansible.playbook = "provisioning/provisioning.yml"
+  end
+
+  config.vm.provision "shell", 
+    run: "always",
+    inline: "ip route del default dev enp0s3"
+
+  (1..3).each do |i|
+    config.vm.define "k8snode#{i}" do |node|
+      node.vm.hostname = "k8snode#{i}"
+      node.vm.network "private_network", ip: "10.255.255.10#{i}", virtualbox__intnet: "k8snet"
+      node.vm.network "public_network", ip: "192.168.123.20#{i}", bridge: "eno1"
+      node.vm.disk :disk, size: "20GB", primary: true
+      node.vm.disk :disk, size: "60GB", primary: false, name: "data"
+
+      node.vm.provider "virtualbox" do |vb|
+        # Use linked images instead of copying the base for
+        # each vm
+        vb.linked_clone = true
+
+        # Display the VirtualBox GUI when booting the machine
+        vb.gui = false 
+
+        # Set up the VM's name
+        vb.name = "k8snode#{i}"
+
+        # Don't check for guest additions
+        vb.check_guest_additions = false 
+    
+        # Customize the amount of memory on the VM:
+        vb.memory = "10240"
+        # Customize the amount of vcpus
+        vb.cpus = "4"
+
+	vb.customize ["modifyvm", :id, "--groups", "/kubernetes"]
+        vb.customize ["modifyvm", :id, "--audio", "none" ]
+        vb.customize ["modifyvm", :id, "--vram", "16" ]
+        vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga" ]
+      end
+    end
+  end
+end

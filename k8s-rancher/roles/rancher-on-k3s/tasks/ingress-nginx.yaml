@@ -1,0 +1,24 @@
+- name: Add ingress-nginx Helm repository
+  kubernetes.core.helm_repository:
+    name: ingress-nginx
+    repo_url: https://kubernetes.github.io/ingress-nginx
+  tags:
+    - ingress-nginx
+- name: Install/Upgrade ingress-nginx
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    chart_version: "{{ ingress_nginx_chart_version }}"
+    namespace: kube-system
+    values:
+      controller:
+        service:
+          type: NodePort
+          nodePorts:
+            http: "{{ ingress_nginx_nodeport_http }}"
+            https: "{{ ingress_nginx_nodeport_https }}"
+    wait: true
+    wait_timeout: 600s
+  tags:
+    - ingress-nginx

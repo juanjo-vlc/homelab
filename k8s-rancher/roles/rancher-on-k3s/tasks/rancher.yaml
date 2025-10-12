@@ -1,0 +1,98 @@
+- name: Add the Rancher Helm repository
+  kubernetes.core.helm_repository:
+    name: rancher-stable
+    repo_url: https://releases.rancher.com/server-charts/stable
+  tags:
+    - rancher
+- name: Create cattle-system namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: cattle-system
+  tags:
+    - rancher
+- name: Create secret for Private CAs.
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: tls-ca
+        namespace: cattle-system
+      type: kubernetes.io/generic
+      data:
+        cacerts.pem: "{{ rancher_privateca_pem |b64encode}}"
+  tags:
+    - rancher 
+- name: Create secret for Rancher ingress TLS.
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: tls-rancher-ingress
+        namespace: cattle-system
+      spec:
+        secretName: tls-rancher-ingress
+        dnsNames: 
+          - "{{ rancher_hostname }}"
+        commonName: rancher.cattle-system.svc.cluster.local
+        issuerRef:
+          name: "{{ certmanager_cluster_issuer_name }}"
+          kind: ClusterIssuer
+        duration: 24h
+        renewBefore: 1h
+  tags:
+    - rancher
+- name: Install/Upgrade Rancher
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: rancher
+    chart_ref: rancher-stable/rancher
+    chart_version: "{{ rancher_chart_version }}"
+    namespace: cattle-system
+    create_namespace: false
+    values:
+      hostname: "{{ rancher_hostname }}"
+      bootstrapPassword: "{{ rancher_bootstrap_password }}"
+      replicas: 1
+      auditLog:
+        enabled: true
+        maxBackup: 10
+      ingress:
+        ingressClassName: nginx
+        tls:
+          source: secret
+          secretName: tls-rancher-ingress
+        annotations:
+          kubernetes.io/ingress.class: nginx
+          cert-manager.io/cluster-issuer: "{{ certmanager_cluster_issuer_name }}"
+      privateCA: true
+      additionalTrustedCAs: false
+    wait: true
+    wait_timeout: 600s
+    force: true
+    update_repo_cache: true
+  tags:
+    - rancher
+- name: Wait for Rancher deployment to be available
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ kubeconfig }}"
+    kind: Deployment
+    namespace: cattle-system
+    name: rancher
+  register: rancher_deployment
+  until: rancher_deployment.resources[0].status.availableReplicas == rancher_deployment.resources[0].status.replicas
+  retries: 10
+  delay: 30
+  tags:
+    - rancher
+

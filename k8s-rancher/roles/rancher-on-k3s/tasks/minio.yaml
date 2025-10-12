@@ -1,0 +1,96 @@
+- name: Create minio namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: minio
+  tags:
+    - minio
+- name: Create a secret for minio tls using cert-manager
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: minio-tls
+        namespace: minio
+      spec:
+        secretName: minio-tls
+        dnsNames:
+          - minio.minio.svc.cluster.local
+          - "*.minio-svc.minio.svc"
+          - "*.minio-svc.minio.svc.cluster.local"
+        commonName: minio.minio.svc.cluster.local
+        issuerRef:
+          name: "{{ certmanager_cluster_issuer_name }}"
+          kind: ClusterIssuer
+        duration: 24h
+        renewBefore: 1h
+  tags:
+    - minio
+- name: Add minio helm repository
+  kubernetes.core.helm_repository:
+    name: minio
+    repo_url: https://charts.min.io/
+  tags:
+    - minio
+- name: Install/Upgrade MinIO
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: minio
+    chart_ref: minio/minio
+    chart_version: "{{ minio_chart_version }}"
+    namespace: minio
+    values:
+      replicas: 2
+      tls:
+        enabled: true
+        certSecret: minio-tls
+        publicCrt: tls.crt
+        privateKey: tls.key
+      persistence:
+        enabled: true
+        storageClass: "longhorn"
+        size: "{{ minio_storage_size}}"
+      ingress:
+        enabled: true
+        annotations:
+          nginx.ingress.kubernetes.io/secure-backends: "true"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          cert-manager.io/cluster-issuer: "{{ certmanager_cluster_issuer_name }}"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          kubernetes.io/ingress.class: nginx
+        ingressClassName: nginx
+        hosts:
+          - "{{ minio_hostname }}"
+        tls:
+          - secretName: minio-ingress-tls
+            hosts:
+              - "{{ minio_hostname }}"
+      consoleIngress:
+        enabled: true
+        annotations:
+          nginx.ingress.kubernetes.io/secure-backends: "true"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+          cert-manager.io/cluster-issuer: "{{ certmanager_cluster_issuer_name }}"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          kubernetes.io/ingress.class: nginx
+        ingressClassName: nginx
+        hosts:
+          - "{{ minio_console_hostname }}"
+        tls:
+          - secretName: minio-console-ingress-tls
+            hosts:
+              - "{{ minio_console_hostname }}"
+      resources:
+        requests:
+          memory: 1Gi
+    wait: true
+    wait_timeout: 600s
+  tags:
+    - minio

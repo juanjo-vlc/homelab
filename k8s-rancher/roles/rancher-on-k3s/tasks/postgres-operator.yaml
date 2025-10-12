@@ -1,0 +1,16 @@
+- name: Add postgres-operator Helm repository
+  kubernetes.core.helm_repository:
+    name: postgres-operator-charts
+    repo_url: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+  tags:
+    - postgres-operator
+- name: Install/Upgrade Postgres Operator
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: postgres-operator
+    chart_ref: postgres-operator-charts/postgres-operator
+    chart_version: "{{ postgres_operator_chart_version }}"
+    namespace: postgres-operator
+    create_namespace: true
+  tags:
+    - postgres-operator

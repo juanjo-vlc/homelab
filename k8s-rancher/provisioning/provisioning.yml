@@ -1,0 +1,163 @@
+---
+- name: Vagrant provisioning
+  hosts: all
+  become: true
+  become_method: sudo
+  vars:
+    local_domain: garmo.local
+    local_dns: 192.168.123.77
+    local_gateway: 192.168.123.1
+  tasks:
+    - name: add cotterpin user
+      user:
+        name: cotterpin
+        comment: Automation user
+        password: "{{ 'thisisnotsafe' |password_hash('sha512', 'salt') }}"
+        shell: /bin/bash
+        password_lock: yes
+
+    - name: setup cotterpin ssh key
+      authorized_key:
+        user: cotterpin
+        key: "{{ lookup('file', './keys/cotterpin-id_rsa.pub') }}"
+
+    - name: setup juanjo ssh key for cotterpin
+      authorized_key:
+        user: cotterpin
+        key: "{{ lookup('file', './keys/juanjo-id_rsa.pub') }}"
+
+    - name: setup sudoers
+      copy:
+        dest: /etc/sudoers.d/cotterpin
+        content: "cotterpin ALL=(ALL) NOPASSWD:ALL"
+
+    - name: install anthrax ca CentOS/RedHat
+      copy:
+        src: tls/anthraxca.crt
+        dest: /etc/pki/ca-trust/source/anchors/anthraxca.crt
+      notify: update ca trust
+      when: "ansible_distribution != 'Ubuntu'"
+
+    - name: install anthax ca Ubuntu
+      copy:
+        src: tls/anthraxca.crt
+        dest: /usr/local/share/ca-certificates/anthraxca.crt
+      notify: update ca-certificates
+      when: "ansible_distribution == 'Ubuntu'"
+
+    - name: Disable apparmor
+      ansible.builtin.service:
+        name: apparmor
+        state: stopped
+        enabled: false
+      when: "ansible_distribution == 'Ubuntu'"
+
+    - name: Setup vim
+      copy:
+        content: |
+          set nocompatible
+          autocmd FileType yaml setlocal ai ts=2 sw=2 et nu colorcolumn=1,3,5,7,9,11,13
+          set background=dark
+          filetype plugin indent on
+          set smartcase
+        dest: /etc/vim/vimrc.local
+        backup: yes
+    - block:
+        - name: Partition addtional disk
+          community.general.parted:
+            device: /dev/sdb
+            fs_type: xfs
+            label: gpt
+            name: data
+            number: 1
+            part_start: 0%
+            part_end: 100%
+            state: present
+        - name: Format additional disk
+          community.general.filesystem:
+            dev: /dev/sdb1
+            fstype: xfs
+            state: present
+        - name: Mount additional disk
+          ansible.posix.mount:
+            backup: true
+            fstype: xfs
+            path: /data
+            src: /dev/sdb1
+            state: mounted
+    - name: Update system packages
+      package:
+        name: '*'
+        state: latest
+        update_cache: true
+    - name: Increase number of inotify watchers
+      sysctl:
+        name: fs.inotify.max_user_watches
+        value: 524288
+        sysctl_file: /etc/sysctl.d/90-watch.conf
+    - name: Install prerequisites packages
+      apt:
+        name:
+          - apt-transport-https
+          - curl
+          - ca-certificates
+          - gpg
+          - libcgroup2
+        state: latest
+        update_cache: yes
+    - name: Update default grub cmdline
+      lineinfile:
+        path: /etc/default/grub
+        line: GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 biosdevname=0 systemd.unified_cgroup_hierarchy=1 cgroup_no_v1=all"
+        regexp: GRUB_CMDLINE_LINUX_DEFAULT=.*
+      register: grub_default_cmdline
+    - name: Update grub cmdline
+      lineinfile:
+        path: /etc/default/grub
+        line: GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0 systemd.unified_cgroup_hierarchy=1 cgroup_no_v1=all"
+        regexp: GRUB_CMDLINE_LINUX=.*
+      register: grub_cmdline
+    - block:
+        - name: Reconfigure grub
+          command:
+            cmd: update-grub
+        - name: Reboot to enforce cgroup v2
+          reboot:
+      when: grub_cmdline.changed or grub_default_cmdline.changed
+    - name: Add a custom route for k8s networking
+      copy:
+        content: |
+          network:
+            version: 2
+            renderer: networkd
+            ethernets:
+              enp0s8:
+                routes:
+                  - to: 10.96.0.0/16
+                    via: 0.0.0.0
+              enp0s9:
+                routes:
+                  - to: default
+                    via: {{ local_gateway }}
+                    metric: 1
+                nameservers:
+                  search: ["{{ local_domain }}"]
+                  addresses: ["{{ local_dns }}"]
+
+        dest: /etc/netplan/99-k8s-routes.yaml
+      notify: "Apply netplan"
+    - name: Run handlers
+      meta: flush_handlers
+    - name: Reboot the machine with all defaults options
+      reboot:
+
+  handlers:
+    - name: update ca trust
+      command:
+        cmd: update-ca-trust
+    - name: update ca-certificates
+      command:
+        cmd: update-ca-certificates
+    - name: Apply netplan
+      command:
+        cmd: netplan apply

@@ -1,0 +1,109 @@
+- name: Download k3s binary
+  ansible.builtin.get_url:
+    url: https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s
+    dest: ./files/k3s-{{ k3s_version }}
+    mode: '0755'
+    checksum: "{{ k3s_sha256 }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  tags:
+    - download
+- name: Download k3s installer
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: ./files/k3s-installer
+    mode: '0755'
+    checksum: "{{ k3s_installer_sha256 }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  tags:
+    - download
+- name: Copy k3s binary to remote hosts
+  copy:
+    src: ./files/k3s-{{ k3s_version }}
+    dest: /usr/local/bin/k3s
+    mode: '0755'
+- name: Copy k3s installer to remote hosts
+  copy:
+    src: ./files/k3s-installer
+    dest: /usr/local/bin/k3s-installer
+    mode: '0755'
+- block:
+  - name: Install K3s on the first control plane node
+    shell: >
+      k3s-installer server
+      --cluster-init
+      --token {{ k3s_token }}
+      --disable traefik
+      --disable servicelb
+      --tls-san {{ lb_ip }}
+      --tls-san {{ lb_hostname }}
+      --advertise-address {{ ansible_host }}
+      --default-local-storage-path /data/k3s
+    environment:
+      INSTALL_K3S_SKIP_DOWNLOAD: "true"
+    any_errors_fatal: true
+  - name: Ensure K3s service is started and enabled
+    ansible.builtin.service:
+      name: k3s
+      state: started
+      enabled: true
+  - name: Wait for K3s to be ready
+    shell: |
+      kubectl get nodes --no-headers | grep ' Ready ' 
+    register: k3s_ready
+    retries: 10
+    delay: 6
+    until: k3s_ready.rc == 0
+  when: is_first_control_plane_node | default(false)
+  tags:
+    - first_cp
+- block:
+  - name: Install K3s on other control plane nodes
+    shell: >
+      k3s-installer server 
+      --server https://{{ lb_hostname }}:6443
+      --token {{ k3s_token }}
+      --disable traefik
+      --disable servicelb
+      --advertise-address {{ ansible_host }}
+      --default-local-storage-path /data/k3s
+    environment:
+      INSTALL_K3S_SKIP_DOWNLOAD: "true"
+  - name: Ensure K3s service is started and enabled
+    ansible.builtin.service:
+      name: k3s
+      state: started
+      enabled: true
+
+  - name: Wait for K3s to be ready
+    shell: |
+      kubectl get nodes --no-headers | grep ' Ready ' 
+    register: k3s_ready
+    retries: 10
+    delay: 6
+    until: k3s_ready.rc == 0
+  when: not (is_first_control_plane_node | default(false))
+  tags:
+    - other_cp
+- name: Copy kubeconfig to local machine
+  fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ kubeconfig }}"
+    flat: yes
+  run_once: true
+  tags:
+    - kubeconfig
+- name: Adjust kubeconfig to use the load balancer address
+  delegate_to: localhost
+  become: false
+  run_once: true
+  ansible.builtin.lineinfile:
+    path: "{{ kubeconfig }}"
+    regexp: '^( *server:).*'
+    line: '\1 https://{{ lb_hostname }}:6443'
+    backrefs: true
+  tags:
+    - kubeconfig

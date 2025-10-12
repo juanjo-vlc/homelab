@@ -1,0 +1,4 @@
+[cluster_managers]
+k8snode1
+k8snode2
+k8snode3

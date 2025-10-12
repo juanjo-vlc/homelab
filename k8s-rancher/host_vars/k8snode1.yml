@@ -1,0 +1,2 @@
+ansible_host: 192.168.123.201
+is_first_control_plane_node: true

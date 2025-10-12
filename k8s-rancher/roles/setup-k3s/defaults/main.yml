@@ -1,0 +1,10 @@
+---
+# defaults file for rancher-on-k3s
+k3s_token: "thisisnotsafe"
+k3s_version: "v1.32.9+k3s1"
+k3s_sha256: "sha256:a8c6194fca78d0969fd1a6cd893dbbe8ec108d9ac087ead8eda0d8d096b47718"
+k3s_installer_sha256: "sha256:8598e002e61d658fed7b7542fc6d2c66d8da6eae69e088830105d2ee1ffb6d91"
+k3s_bootstrap_password: ""
+lb_ip: "192.168.1.1"
+lb_hostname: "lb.mydomain.tld"
+kubeconfig: ~/.kube/config

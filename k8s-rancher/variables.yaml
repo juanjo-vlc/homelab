@@ -1,0 +1,9 @@
+k3s_token: thisisnotsafe
+rancher_bootstrap_password: changeme
+certmanager_subca_crt: |
+  -----BEGIN CERTIFICATE-----
+  -----END CERTIFICATE-----
+
+certmanager_subca_key: |
+  -----BEGIN PRIVATE KEY-----
+  -----END PRIVATE KEY-----

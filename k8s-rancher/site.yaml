@@ -1,0 +1,30 @@
+---
+- name: Setup K3s Cluster with Rancher
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+    lb_ip: "192.168.123.100"
+    lb_hostname: "anthrax.garmo.local"
+    kubeconfig: ~/.kube/anthrax.yaml
+    k3s_version: "v1.32.8+k3s1"
+    k3s_sha256: "sha256:639a113cfc5465082fd98ff2947a3d962039f78adddefbf4a4aecf4a1f485e79"
+  tasks:
+    - name: Include K3s installation tasks
+      import_role:
+        name: setup-k3s
+      tags: 
+        - setup-k3s
+- name: Setup Rancher on K3s
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    kubeconfig: ~/.kube/anthrax.yaml
+    rancher_privateca_pem: "{{ lookup('file', 'files/tls/anthraxca.crt')}}"
+  tasks:
+    - name: Include K3s installation tasks
+      import_role:
+        name: rancher-on-k3s
+      tags: 
+        - rancher-on-k3s
