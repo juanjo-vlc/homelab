@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sops-test-pod
+  namespace: default
+spec:
+  containers:
+  - name: test-container
+    image: busybox:latest
+    command: ['sh', '-c', 'echo "Username: $USERNAME" && echo "Password: $PASSWORD" && echo "API Key: $API_KEY" && sleep 3600']
+    env:
+    - name: USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: test-sops-secret
+          key: username
+    - name: PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: test-sops-secret
+          key: password
+    - name: API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: test-sops-secret
+          key: api-key
+    - name: APP_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: test-sops-configmap
+          key: app-name
+  restartPolicy: Never

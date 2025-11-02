@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sops-test-app
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/juanjo-vlc/homelab.git
+    targetRevision: k8s-rancher-additional/test-sops  # or master, depending on your default branch
+    path: homelab/k8-rancher-additional/sops-tests/encrypted  # Path to encrypted manifests
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test-sops
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

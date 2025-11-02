@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-sops-configmap
+  namespace: default
+data:
+  app-name: sops-test-application
+  environment: development
+  log-level: debug
