@@ -1,0 +1,15 @@
+---
+- name: Setup K3s Cluster with Rancher
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    kubeconfig: ~/.kube/anthrax.yaml
+    argocd_host: argocd.garmo.local
+    certmanager_cluster_issuer_name: rancher-subca
+  tasks:
+    - name: Include K8s addons
+      import_role:
+        name: k8s-addons
+      tags: 
+        - k8s-addons

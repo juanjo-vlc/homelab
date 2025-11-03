@@ -1,0 +1,106 @@
+- name: Install ArgoCD using kubectl
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: argocd
+
+- name: Add ArgoCD Helm repository
+  kubernetes.core.helm_repository:
+    name: argo
+    repo_url: https://argoproj.github.io/argo-helm
+
+- name: Install/Upgrade ArgoCD
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: argocd
+    chart_ref: argo/argo-cd
+    chart_version: "{{ argocd_chart_version }}"
+    namespace: argocd
+    values:
+      global:
+        domain: "{{ argocd_host }}"
+      configs:
+        cm:
+          kustomize.buildOptions: "--enable-alpha-plugins --enable-exec"
+        params:
+          server.insecure: "true"
+      server:
+        ingress:
+          enabled: true
+          annotations:
+            kubernetes.io/ingress.class: nginx
+            cert-manager.io/cluster-issuer: "{{ certmanager_cluster_issuer_name }}"
+            nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+          tls: true
+      repoServer:
+          # Use init containers to configure custom tooling
+          # https://argoproj.github.io/argo-cd/operator-manual/custom_tools/
+        env:
+          - name: GNUPGHOME
+            value: /sops-gpg/.gnupg
+          - name: XDG_CONFIG_HOME
+            value: /kustomize-plugin-home
+        volumes:
+          - name: custom-tools
+            emptyDir: {}
+          - name: sops-gpg
+            secret:
+              secretName: sops-gpg
+              defaultMode: 0400
+        initContainers:
+        - name: install-ksops
+          image: juanjovlc2/install-ksops:4.4.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              # Install KSOPS and SOPS binaries
+              tar -C /custom-tools -xzf /tools/ksops_4.4.0_Linux_x86_64.tar.gz ksops
+              chmod +x /custom-tools/ksops
+              cp /tools/sops-v3.11.0.linux.amd64 /custom-tools/sops
+              chmod +x /custom-tools/sops
+
+              # Setup KSOPS as a kustomize exec plugin
+              mkdir -p /custom-tools/kustomize/plugin/viaduct.ai/v1/ksops
+              cp /custom-tools/ksops /custom-tools/kustomize/plugin/viaduct.ai/v1/ksops/ksops
+
+              # Import GPG key
+              mkdir -p /custom-tools/sops-gpg/.gnupg
+              chmod 700 /custom-tools/sops-gpg/.gnupg
+              gpg --homedir /custom-tools/sops-gpg/.gnupg --import /sops-gpg-keys/sops.asc
+
+              # Set ultimate trust for the imported key
+              KEY_FP=$(gpg --homedir /custom-tools/sops-gpg/.gnupg --list-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
+              echo "${KEY_FP}:6:" | gpg --homedir /custom-tools/sops-gpg/.gnupg --import-ownertrust
+
+              # Fix permissions
+              chmod -R 600 /custom-tools/sops-gpg/.gnupg/*
+              chmod 700 /custom-tools/sops-gpg/.gnupg
+              chown -R 999:999 /custom-tools/sops-gpg/
+              chown -R 999:999 /custom-tools/kustomize/
+          volumeMounts:
+            - mountPath: /custom-tools
+              name: custom-tools
+            - mountPath: /sops-gpg-keys
+              name: sops-gpg
+        volumeMounts:
+          - mountPath: /usr/local/bin/ksops
+            name: custom-tools
+            subPath: ksops
+          - mountPath: /usr/local/bin/sops
+            name: custom-tools
+            subPath: sops
+          - mountPath: /sops-gpg
+            name: custom-tools
+            subPath: sops-gpg
+          - mountPath: /kustomize-plugin-home/kustomize/plugin
+            name: custom-tools
+            subPath: kustomize/plugin
+      wait: true
+      wait_timeout: 600s
+  

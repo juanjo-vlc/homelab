@@ -1,0 +1,5 @@
+---
+# tasks file for k8s-addons
+- import_tasks: argocd.yaml
+  tags: 
+    - argocd

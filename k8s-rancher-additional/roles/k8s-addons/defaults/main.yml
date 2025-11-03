@@ -1,0 +1,8 @@
+---
+# defaults file for k8s-addons
+argocd_host: argocd.example.com
+argocd_chart_version: 9.0.3
+certmanager_cluster_issuer_name: my-cluster-issuer
+
+sops_version: 3.11.0
+sops_checksum: c36583e178f7e83b947044b292e106e79615f7725f75cb147045fb0c81953e2b
