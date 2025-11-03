@@ -1,3 +1,7 @@
+- name: Add nfs-common package
+  package:
+    name: nfs-common
+    state: present
 - name: Add longhorn Helm repository
   kubernetes.core.helm_repository:
     name: longhorn
